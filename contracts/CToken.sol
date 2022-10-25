@@ -7,6 +7,7 @@ import "./ErrorReporter.sol";
 import "./EIP20Interface.sol";
 import "./InterestRateModel.sol";
 import "./ExponentialNoError.sol";
+import "hardhat/console.sol";
 
 /**
  * @title Compound's CToken Contract
@@ -398,17 +399,19 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
     function mintFresh(address minter, uint mintAmount) internal {
         /* Fail if mint not allowed */
         uint allowed = comptroller.mintAllowed(address(this), minter, mintAmount);
+        
         if (allowed != 0) {
             revert MintComptrollerRejection(allowed);
         }
 
         /* Verify market's block number equals current block number */
+        //因為每次都會執行accrueInterest，就會更新區塊高度，所以會一致
         if (accrualBlockNumber != getBlockNumber()) {
             revert MintFreshnessCheck();
         }
-
+        //取得當下的changeRate
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
-
+        
         /////////////////////////
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
@@ -427,10 +430,10 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          * We get the current exchange rate and calculate the number of cTokens to be minted:
          *  mintTokens = actualMintAmount / exchangeRate
          */
-
+        console.log("actualMintAmount",actualMintAmount);
         uint mintTokens = div_(actualMintAmount, exchangeRate);
-
-        /*
+        console.log("mintTokens",mintTokens);
+        /*  
          * We calculate the new total supply of cTokens and minter token balance, checking for overflow:
          *  totalSupplyNew = totalSupply + mintTokens
          *  accountTokensNew = accountTokens[minter] + mintTokens

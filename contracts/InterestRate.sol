@@ -6,7 +6,7 @@ import "./InterestRateModel.sol";
 contract InterestRate is InterestRateModel{
 
   function getBorrowRate(uint cash, uint borrows, uint reserves) override external view returns (uint){
-    return 2*10**18;
+    return 2*10**12;
   }
 
   function getSupplyRate(uint cash, uint borrows, uint reserves, uint reserveFactorMantissa) override external view returns (uint){

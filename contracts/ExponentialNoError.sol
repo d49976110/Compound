@@ -118,6 +118,7 @@ contract ExponentialNoError {
     }
 
     function mul_(uint a, Exp memory b) pure internal returns (uint) {
+        // a * b.mantissa / 10**18
         return mul_(a, b.mantissa) / expScale;
     }
 
@@ -146,6 +147,7 @@ contract ExponentialNoError {
     }
 
     function div_(uint a, Exp memory b) pure internal returns (uint) {
+        // a * 10**18 / b.mantissa
         return div_(mul_(a, expScale), b.mantissa);
     }
 
