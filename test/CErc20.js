@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("CErc20", async () => {
-    let erc20, cerc20, comptroller, interestRate;
+    let erc20, cerc20, comptroller, interestRate, oracle;
     let amount = ethers.utils.parseEther("100");
     // rate = 1:1
     let changeRate = BigInt(10 ** 18);
@@ -22,6 +22,9 @@ describe("CErc20", async () => {
 
         let Comptroller = await ethers.getContractFactory("Comptroller");
         comptroller = await Comptroller.deploy();
+
+        let Oracle = await ethers.getContractFactory("PirceOracleImplement");
+        oracle = await Oracle.deploy();
     });
 
     it("deploy CErc20", async function () {
@@ -41,6 +44,8 @@ describe("CErc20", async () => {
     it("set comptroller", async () => {
         //support market
         await comptroller._supportMarket(cerc20.address);
+        //set oracle
+        await comptroller._setPriceOracle(oracle.address);
         //enterMarkets
         await comptroller.enterMarkets([cerc20.address]);
     });
@@ -55,5 +60,12 @@ describe("CErc20", async () => {
     it("CErc20 mint", async () => {
         await cerc20.mint(amount);
         expect(await cerc20.balanceOf(owner.address)).to.eq(amount);
+    });
+
+    it("redeem", async () => {
+        await cerc20.redeem(amount);
+        console.log("erc20 balance", await erc20.balanceOf(owner.address));
+
+        expect(await cerc20.balanceOf(owner.address)).to.eq(0);
     });
 });

@@ -294,14 +294,16 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         if (!markets[cToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
-
+        
         /* If the redeemer is not 'in' the market, then we can bypass the liquidity check */
         if (!markets[cToken].accountMembership[redeemer]) {
             return uint(Error.NO_ERROR);
         }
-
+        
+        //需要用oracle來計算當前總資產與總負債
         /* Otherwise, perform a hypothetical liquidity check to guard against shortfall */
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, CToken(cToken), redeemTokens, 0);
+        console.log("no shortfall");
         if (err != Error.NO_ERROR) {
             return uint(err);
         }
@@ -725,13 +727,15 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         CToken cTokenModify,
         uint redeemTokens,
         uint borrowAmount) internal view returns (Error, uint, uint) {
-
+        
+        //防止stack too deep所設置的struct
         AccountLiquidityLocalVars memory vars; // Holds all our calculation results
         uint oErr;
-
+        
         // For each asset the account is in
         CToken[] memory assets = accountAssets[account];
         for (uint i = 0; i < assets.length; i++) {
+            
             CToken asset = assets[i];
 
             // Read the balances and exchange rate from the cToken
@@ -741,24 +745,28 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             }
             vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});
             vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
-
-            // Get the normalized price of the asset
+            console.log("vars.exchangeRate",vars.exchangeRate.mantissa);
+            
+            //從oracle中取得該token的報價
             vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
+            console.log("vars.oraclePriceMantissa",vars.oraclePriceMantissa);
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
-
+            console.log("vars.oraclePrice",vars.oraclePrice.mantissa);
             // Pre-compute a conversion factor from tokens -> ether (normalized price value)
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
-
+            console.log("vars.tokensToDenom",vars.tokensToDenom.mantissa);
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
-
+            console.log("vars.sumCollateral",vars.sumCollateral);
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
-
+            console.log("vars.sumBorrowPlusEffects",vars.sumBorrowPlusEffects);
             // Calculate effects of interacting with cTokenModify
+            
+            //如果是當前的token，則需要將此次操作的redeem或是borrow加入到sumBorrowPlusEffects
             if (asset == cTokenModify) {
                 // redeem effect
                 // sumBorrowPlusEffects += tokensToDenom * redeemTokens
@@ -772,6 +780,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
 
         // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
+            //如果總抵押大於借款，則返回0 =>代表沒有shortfall
             return (Error.NO_ERROR, vars.sumCollateral - vars.sumBorrowPlusEffects, 0);
         } else {
             return (Error.NO_ERROR, 0, vars.sumBorrowPlusEffects - vars.sumCollateral);

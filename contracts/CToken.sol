@@ -409,7 +409,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         if (accrualBlockNumber != getBlockNumber()) {
             revert MintFreshnessCheck();
         }
-        //取得當下的changeRate
+        //取得當下的changeRate，透過exchangeRateStoredInternal即時計算
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
         
         /////////////////////////
@@ -459,6 +459,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
     function redeemInternal(uint redeemTokens) internal nonReentrant {
         accrueInterest();
         // redeemFresh emits redeem-specific logs on errors, so we don't need to
+        
         redeemFresh(payable(msg.sender), redeemTokens, 0);
     }
 
@@ -485,7 +486,6 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
 
         /* exchangeRate = invoke Exchange Rate Stored() */
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal() });
-
         uint redeemTokens;
         uint redeemAmount;
         /* If redeemTokensIn > 0: */
@@ -497,6 +497,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
              */
             redeemTokens = redeemTokensIn;
             redeemAmount = mul_ScalarTruncate(exchangeRate, redeemTokensIn);
+            console.log("redeemAmount",redeemAmount);
         } else {
             /*
              * We get the current exchange rate and calculate the amount to be redeemed:
