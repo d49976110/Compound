@@ -743,7 +743,18 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             if (oErr != 0) { // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
                 return (Error.SNAPSHOT_ERROR, 0, 0);
             }
+            // markets是在ComptrollerStorage，mapping(address => Market) public markets 
+            /*
+                struct Market {
+                    bool isListed;                    
+                    uint collateralFactorMantissa;                
+                    mapping(address => bool) accountMembership;
+                    bool isComped;
+                }
+            */
+            //需要先設定該token的collateralFactor
             vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});
+            console.log("vars.collateralFactor",vars.collateralFactor.mantissa);
             vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
             console.log("vars.exchangeRate",vars.exchangeRate.mantissa);
             
@@ -752,6 +763,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
+            console.log("--- Oracle ---");
             console.log("vars.oraclePriceMantissa",vars.oraclePriceMantissa);
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
             console.log("vars.oraclePrice",vars.oraclePrice.mantissa);
@@ -880,14 +892,16 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         }
 
         // Verify market is listed
+        //確認該token是否有list
         Market storage market = markets[address(cToken)];
         if (!market.isListed) {
             return fail(Error.MARKET_NOT_LISTED, FailureInfo.SET_COLLATERAL_FACTOR_NO_EXISTS);
         }
-
+        //將newCollateralFactorMantissa轉成Exp格式，來跟collateralFactorMaxMantissa比較
         Exp memory newCollateralFactorExp = Exp({mantissa: newCollateralFactorMantissa});
 
         // Check collateral factor <= 0.9
+        //檢查是否超過0.9
         Exp memory highLimit = Exp({mantissa: collateralFactorMaxMantissa});
         if (lessThanExp(highLimit, newCollateralFactorExp)) {
             return fail(Error.INVALID_COLLATERAL_FACTOR, FailureInfo.SET_COLLATERAL_FACTOR_VALIDATION);
@@ -901,7 +915,6 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         // Set market's collateral factor to new collateral factor, remember old value
         uint oldCollateralFactorMantissa = market.collateralFactorMantissa;
         market.collateralFactorMantissa = newCollateralFactorMantissa;
-
         // Emit event with asset, old collateral factor, and new collateral factor
         emit NewCollateralFactor(cToken, oldCollateralFactorMantissa, newCollateralFactorMantissa);
 

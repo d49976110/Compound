@@ -159,6 +159,8 @@ contract CErc20 is CToken, CErc20Interface {
      *      Note: This wrapper safely handles non-standard ERC-20 tokens that do not return a value.
      *            See here: https://medium.com/coinmonks/missing-return-value-bug-at-least-130-tokens-affected-d67bf08521ca
      */
+
+    //返回直並不是傳入的amount，而是該合約收到token前後的balance差額
     function doTransferIn(address from, uint amount) virtual override internal returns (uint) {
         // Read from storage once
         address underlying_ = underlying;
@@ -166,6 +168,7 @@ contract CErc20 is CToken, CErc20Interface {
         uint balanceBefore = EIP20Interface(underlying_).balanceOf(address(this));
         token.transferFrom(from, address(this), amount);
 
+        //為什麼這邊不要直接 bool success = token.transferFrom(from, address(this), amount)就好
         bool success;
         assembly {
             switch returndatasize()

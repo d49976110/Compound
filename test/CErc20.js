@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("CErc20", async () => {
-    let erc20, cerc20, comptroller, interestRate, oracle;
+    let erc20, cerc20, comptroller, interestRateModel, oracle;
     let amount = ethers.utils.parseEther("100");
     // rate = 1:1
     let changeRate = BigInt(10 ** 18);
@@ -17,8 +17,8 @@ describe("CErc20", async () => {
         let Erc20 = await ethers.getContractFactory("WETH");
         erc20 = await Erc20.deploy();
 
-        let InterestRate = await ethers.getContractFactory("InterestRate");
-        interestRate = await InterestRate.deploy();
+        let InterestRateModel = await ethers.getContractFactory("InterestRate");
+        interestRateModel = await InterestRateModel.deploy();
 
         let Comptroller = await ethers.getContractFactory("Comptroller");
         comptroller = await Comptroller.deploy();
@@ -32,7 +32,7 @@ describe("CErc20", async () => {
         cerc20 = await CERC20.deploy(
             erc20.address,
             comptroller.address,
-            interestRate.address,
+            interestRateModel.address,
             changeRate,
             name,
             symbol,
@@ -48,6 +48,8 @@ describe("CErc20", async () => {
         await comptroller._setPriceOracle(oracle.address);
         //enterMarkets
         await comptroller.enterMarkets([cerc20.address]);
+        //set collateral
+        await comptroller._setCollateralFactor(cerc20.address, BigInt(0.9 * 1e18));
     });
 
     it("mint & approve ERC20", async () => {
