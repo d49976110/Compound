@@ -98,6 +98,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      * @param account The address of the account to pull assets for
      * @return A dynamic list with the assets the account has entered
      */
+    //這邊指的accountAsset是Ctoken
     function getAssetsIn(address account) external view returns (CToken[] memory) {
         CToken[] memory assetsIn = accountAssets[account];
 
@@ -722,6 +723,8 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 hypothetical account liquidity in excess of collateral requirements,
      *          hypothetical account shortfall below collateral requirements)
      */
+    // 計算總抵押資產價值，扣除總借款加上此次贖回或是借款，是否 > 0 
+    // 如果只有mint，沒有borrow，則sumCollateral與sumBorrowPlusEffects都會是0
     function getHypotheticalAccountLiquidityInternal(
         address account,
         CToken cTokenModify,
@@ -733,7 +736,9 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         uint oErr;
         
         // For each asset the account is in
+        //取得用戶所有借款資產
         CToken[] memory assets = accountAssets[account];
+
         for (uint i = 0; i < assets.length; i++) {
             
             CToken asset = assets[i];
@@ -758,15 +763,15 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
             console.log("vars.exchangeRate",vars.exchangeRate.mantissa);
             
-            //從oracle中取得該token的報價
+            //從oracle中取得該token的報價，並計算總抵押資產價值，與總借款加上此次贖回或是借款，是否有超過抵押資產的價值
             vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
             console.log("--- Oracle ---");
-            console.log("vars.oraclePriceMantissa",vars.oraclePriceMantissa);
+            // 跟oraclePriceMantissa，只是整理格式
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
-            console.log("vars.oraclePrice",vars.oraclePrice.mantissa);
+            console.log("oracle price: ",vars.oraclePrice.mantissa);
             // Pre-compute a conversion factor from tokens -> ether (normalized price value)
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
             console.log("vars.tokensToDenom",vars.tokensToDenom.mantissa);
@@ -789,10 +794,9 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, borrowAmount, vars.sumBorrowPlusEffects);
             }
         }
-
         // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
-            //如果總抵押大於借款，則返回0 =>代表沒有shortfall
+            //如果總抵押大於借款，則返回0 => 代表沒有shortfall
             return (Error.NO_ERROR, vars.sumCollateral - vars.sumBorrowPlusEffects, 0);
         } else {
             return (Error.NO_ERROR, 0, vars.sumBorrowPlusEffects - vars.sumCollateral);
@@ -887,6 +891,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
       */
     function _setCollateralFactor(CToken cToken, uint newCollateralFactorMantissa) external returns (uint) {
         // Check caller is admin
+        
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SET_COLLATERAL_FACTOR_OWNER_CHECK);
         }
@@ -906,7 +911,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         if (lessThanExp(highLimit, newCollateralFactorExp)) {
             return fail(Error.INVALID_COLLATERAL_FACTOR, FailureInfo.SET_COLLATERAL_FACTOR_VALIDATION);
         }
-
+        
         // If collateral factor != 0, fail if price == 0
         if (newCollateralFactorMantissa != 0 && oracle.getUnderlyingPrice(cToken) == 0) {
             return fail(Error.PRICE_ERROR, FailureInfo.SET_COLLATERAL_FACTOR_WITHOUT_PRICE);
@@ -915,6 +920,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         // Set market's collateral factor to new collateral factor, remember old value
         uint oldCollateralFactorMantissa = market.collateralFactorMantissa;
         market.collateralFactorMantissa = newCollateralFactorMantissa;
+        
         // Emit event with asset, old collateral factor, and new collateral factor
         emit NewCollateralFactor(cToken, oldCollateralFactorMantissa, newCollateralFactorMantissa);
 

@@ -292,6 +292,9 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      * @dev This function does not accrue interest before calculating the exchange rate
      * @return calculated exchange rate scaled by 1e18
      */
+    // 第一次使用initialExchangeRateMantissa，之後開始每次mint、redeem等都會計算
+    // exchangeRate = (totalCash + totalBorrows - totalReserves) * 10**18 / totalSupply
+    // 因為totalBorrows會隨著時間增加，所以分子會越來越大，但是totalSupply不變，因此整體exchangeRate會越來越大
     function exchangeRateStoredInternal() virtual internal view returns (uint) {
         uint _totalSupply = totalSupply;
         if (_totalSupply == 0) {
@@ -306,13 +309,8 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
              *  exchangeRate = (totalCash + totalBorrows - totalReserves) * 10**18 / totalSupply
              */
             uint totalCash = getCashPrior();
-            console.log("--- Exchange Rate ---");
-            console.log("totalCash",totalCash);
-            console.log("totalBorrows",totalBorrows);
-            console.log("totalReserves",totalReserves);
             uint cashPlusBorrowsMinusReserves = totalCash + totalBorrows - totalReserves;
             uint exchangeRate = cashPlusBorrowsMinusReserves * expScale / _totalSupply;
-            console.log("exchangeRate",exchangeRate);
             return exchangeRate;
         }
     }
@@ -332,12 +330,10 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      */
     // totalBorrows 會加上時間利息 : interestAccumulated + borrowsPrior
     function accrueInterest() virtual override public returns (uint) {
-        console.log("--- accrueInterest ---");
+        console.log("------- accrueInterest -------");
         /* Remember the initial block number */
         uint currentBlockNumber = getBlockNumber();
-        console.log("currentBlockNumber",currentBlockNumber);
         uint accrualBlockNumberPrior = accrualBlockNumber;
-        console.log("accrualBlockNumberPrior",accrualBlockNumberPrior);
         /* Short-circuit accumulating 0 interest */
         if (accrualBlockNumberPrior == currentBlockNumber) {
             return NO_ERROR;
@@ -349,13 +345,13 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         uint reservesPrior = totalReserves;
         uint borrowIndexPrior = borrowIndex;
 
-        // borrowRateMantissa = 2*10*12，因為目前使用的InterestRatemodel是 2*10**12
+        // borrowRateMantissa = 目前使用的InterestRatemodel，目前設置為0
         uint borrowRateMantissa = interestRateModel.getBorrowRate(cashPrior, borrowsPrior, reservesPrior);
-        console.log("borrowRateMantissa",borrowRateMantissa);
         
         // borrowRateMaxMantissa寫在CtokenInterface中 0.0005e16 也就是 5*10**12 (.0005% / block)
         require(borrowRateMantissa <= borrowRateMaxMantissa, "borrow rate is absurdly high");
         
+        //上個執行accrueInterest距離目前的區塊數量
         uint blockDelta = currentBlockNumber - accrualBlockNumberPrior;
         console.log("blockDelta",blockDelta);
         
@@ -368,17 +364,17 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          *  borrowIndexNew = simpleInterestFactor * borrowIndex + borrowIndex
          */
         
-        // borrowRate = borrowRateMantissa = 2*10*12
-        // simpleInterestFactor = borrowRate * blockDelta
+
+        // simpleInterestFactor為單利利息係數，用每個區塊的利息*經過的區塊 => borrowRate * blockDelta
         Exp memory simpleInterestFactor = mul_(Exp({mantissa: borrowRateMantissa}), blockDelta);
         console.log("simpleInterestFactor",simpleInterestFactor.mantissa);
+        // interestAccumulated借款累計利息，用當前傯借出金額*單利利息係數 => simpleInterestFactor * totalBorrows
         uint interestAccumulated = mul_ScalarTruncate(simpleInterestFactor, borrowsPrior);
-        console.log("interestAccumulated",interestAccumulated);
+        // totalBorrowsNew當前傯借款金額，包含未還款利息，也就是借款累計利息 + 總借款量 => interestAccumulated + totalBorrows
         uint totalBorrowsNew = interestAccumulated + borrowsPrior;
-        console.log("totalBorrowsNew",totalBorrowsNew);
         uint totalReservesNew = mul_ScalarTruncateAddUInt(Exp({mantissa: reserveFactorMantissa}), interestAccumulated, reservesPrior);
-        console.log("totalReservesNew",totalReservesNew);
-        console.log("--- borrow inddex ---");
+        
+        console.log("------- borrow inddex -------");
         console.log("borrowIndexPrior",borrowIndexPrior);
         //複利公式 borrowIndexNew為總利息 = borrowIndexPrior + borrowIndexPrior * simpleInterestFactor
         uint borrowIndexNew = mul_ScalarTruncateAddUInt(simpleInterestFactor, borrowIndexPrior, borrowIndexPrior);
@@ -431,8 +427,8 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         }
         //取得當下的changeRate，透過exchangeRateStoredInternal即時計算
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
-        console.log("--- mint ---");
-        console.log("mint exchangeRate",exchangeRate.mantissa);
+        console.log("------- mint -------");
+        console.log("exchange rate: ",exchangeRate.mantissa);
         /////////////////////////
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
@@ -447,14 +443,14 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          */
         //返回真的傳入合約的數量
         uint actualMintAmount = doTransferIn(minter, mintAmount);
-        console.log("actualMintAmount",actualMintAmount);
+        console.log("Erc20 amounts: ",actualMintAmount);
         /*
          * We get the current exchange rate and calculate the number of cTokens to be minted:
          *  mintTokens = actualMintAmount / exchangeRate
          */
         //計算CErc20的數量，因為exchangeRate是放大1e18，所以actualMintAmount需要同步乘上1e18
         uint mintTokens = div_(actualMintAmount, exchangeRate);
-        console.log("mintTokens",mintTokens);
+        console.log("CErc20 token amounts: ",mintTokens);
         /*  
          * We calculate the new total supply of cTokens and minter token balance, checking for overflow:
          *  totalSupplyNew = totalSupply + mintTokens
@@ -507,9 +503,10 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         require(redeemTokensIn == 0 || redeemAmountIn == 0, "one of redeemTokensIn or redeemAmountIn must be zero");
 
         /* exchangeRate = invoke Exchange Rate Stored() */
+        // 如果質押後，並沒有人借款，則exchange rate不會變
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal() });
-        console.log("--- redeem ---");
-        console.log("redeem exchangeRate",exchangeRate.mantissa);
+        console.log("------- redeem -------");
+        console.log("exchange rate: ",exchangeRate.mantissa);
         uint redeemTokens;
         uint redeemAmount;
         /* If redeemTokensIn > 0: */
@@ -520,11 +517,11 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
              *  redeemAmount = redeemTokensIn x exchangeRateCurrent
              */
             redeemTokens = redeemTokensIn;
-            console.log("redeemTokensIn",redeemTokensIn);
+            console.log("redeem CErc20 token in",redeemTokensIn);
             // exchangeRate * redeemTokensIn / 1e18
             // 要贖回的ERC20 數量
             redeemAmount = mul_ScalarTruncate(exchangeRate, redeemTokensIn);
-            console.log("redeemAmount",redeemAmount);
+            console.log("redeem Erc20 token out",redeemAmount);
         } else {
             /*
              * We get the current exchange rate and calculate the amount to be redeemed:

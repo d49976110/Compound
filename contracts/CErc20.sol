@@ -35,6 +35,7 @@ contract CErc20 is CToken, CErc20Interface {
         super.initialize(comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // Set underlying and sanity check it
+        // 寫在CErc20Storage為public
         underlying = underlying_;
         EIP20Interface(underlying).totalSupply();
     }

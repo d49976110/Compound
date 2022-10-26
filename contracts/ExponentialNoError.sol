@@ -27,9 +27,9 @@ contract ExponentialNoError {
      * @dev Truncates the given exp to a whole number value.
      *      For example, truncate(Exp{mantissa: 15 * expScale}) = 15
      */
+    // exp.mantissa / 1e18
     function truncate(Exp memory exp) view internal returns (uint) {
         // Note: We are not using careful math here as we're performing a division that cannot fail
-        console.log("exp.mantissa / expScale",exp.mantissa / expScale);
         return exp.mantissa / expScale;
     }
 
@@ -39,7 +39,6 @@ contract ExponentialNoError {
     // a * scalar / 1e18
     function mul_ScalarTruncate(Exp memory a, uint scalar) view internal returns (uint) {
         Exp memory product = mul_(a, scalar);
-        console.log("product",product.mantissa);
         return truncate(product);
     }
 
