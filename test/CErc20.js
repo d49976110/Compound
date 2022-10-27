@@ -3,8 +3,8 @@ const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("CErc20", async () => {
-    let tokenA, tokenB, cTokenA, cTokenB;
-    let comptroller, interestRateModel, oracle;
+    let cerc20, tokenA, tokenB, cTokenA, cTokenB;
+    let unitroller, comptroller, interestRateModel, oracle;
 
     let tokenAmount = BigInt(1000 * 1e18);
     let supplyAmount = BigInt(100 * 1e18);
@@ -31,8 +31,10 @@ describe("CErc20", async () => {
         tokenA = await Erc20.deploy("TokenA", "TOA");
         tokenB = await Erc20.deploy("TokenB", "TOB");
 
-        let InterestRateModel = await ethers.getContractFactory("InterestRate");
-        interestRateModel = await InterestRateModel.deploy();
+        let InterestRateModel = await ethers.getContractFactory(
+            "WhitePaperInterestRateModel"
+        );
+        interestRateModel = await InterestRateModel.deploy(0, 0);
 
         let Comptroller = await ethers.getContractFactory("Comptroller");
         comptroller = await Comptroller.deploy();
@@ -40,8 +42,36 @@ describe("CErc20", async () => {
         let Oracle = await ethers.getContractFactory("SimplePriceOracle");
         oracle = await Oracle.deploy();
 
-        let CERC20 = await ethers.getContractFactory("CErc20Immutable");
-        cTokenA = await CERC20.deploy(
+        let Unitroller = await ethers.getContractFactory("Unitroller");
+        unitroller = await Unitroller.deploy();
+
+        // let CERC20 = await ethers.getContractFactory("CErc20Immutable");
+        // cTokenA = await CERC20.deploy(
+        //     tokenA.address,
+        //     comptroller.address,
+        //     interestRateModel.address,
+        //     changeRate,
+        //     nameA,
+        //     symbolA,
+        //     decimals,
+        //     owner.address
+        // );
+
+        // cTokenB = await CERC20.deploy(
+        //     tokenB.address,
+        //     comptroller.address,
+        //     interestRateModel.address,
+        //     changeRate,
+        //     nameB,
+        //     symbolB,
+        //     decimals,
+        //     owner.address
+        // );
+
+        let CERC20 = await ethers.getContractFactory("CErc20Delegate");
+        let cerc20 = await CERC20.deploy();
+        let delegator = await ethers.getContractFactory("CErc20Delegator");
+        cTokenA = await delegator.deploy(
             tokenA.address,
             comptroller.address,
             interestRateModel.address,
@@ -49,10 +79,11 @@ describe("CErc20", async () => {
             nameA,
             symbolA,
             decimals,
-            owner.address
+            owner.address,
+            cerc20.address,
+            "0x"
         );
-
-        cTokenB = await CERC20.deploy(
+        cTokenB = await delegator.deploy(
             tokenB.address,
             comptroller.address,
             interestRateModel.address,
@@ -60,7 +91,9 @@ describe("CErc20", async () => {
             nameB,
             symbolB,
             decimals,
-            owner.address
+            owner.address,
+            cerc20.address,
+            "0x"
         );
     });
 
@@ -68,6 +101,13 @@ describe("CErc20", async () => {
         it("ERC20 & CERC20 decimals should be 18", async () => {
             expect(await tokenA.decimals()).to.eq(decimals);
             expect(await cTokenA.decimals()).to.eq(decimals);
+        });
+
+        it("set unitroller", async () => {
+            await unitroller._setPendingImplementation(comptroller.address);
+            await unitroller._acceptImplementation();
+
+            await comptroller._become(unitroller.address);
         });
 
         it("admin set oracle & comptroller", async () => {
