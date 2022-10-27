@@ -4,7 +4,7 @@ const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("CErc20", async () => {
     let cerc20, tokenA, tokenB, cTokenA, cTokenB;
-    let unitroller, comptroller, interestRateModel, oracle;
+    let unitroller, Comptroller, comptroller, interestRateModel, oracle;
 
     let tokenAmount = BigInt(1000 * 1e18);
     let supplyAmount = BigInt(100 * 1e18);
@@ -27,47 +27,36 @@ describe("CErc20", async () => {
     before(async () => {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
+        // create tokenA & tokenB
         let Erc20 = await ethers.getContractFactory("ERC20_custom");
         tokenA = await Erc20.deploy("TokenA", "TOA");
         tokenB = await Erc20.deploy("TokenB", "TOB");
 
+        // create interest model
         let InterestRateModel = await ethers.getContractFactory(
             "WhitePaperInterestRateModel"
         );
         interestRateModel = await InterestRateModel.deploy(0, 0);
 
-        let Comptroller = await ethers.getContractFactory("Comptroller");
+        //create comptroller
+        Comptroller = await ethers.getContractFactory("Comptroller");
         comptroller = await Comptroller.deploy();
 
+        //create oracel
         let Oracle = await ethers.getContractFactory("SimplePriceOracle");
         oracle = await Oracle.deploy();
 
+        // set proxy
         let Unitroller = await ethers.getContractFactory("Unitroller");
         unitroller = await Unitroller.deploy();
 
-        // let CERC20 = await ethers.getContractFactory("CErc20Immutable");
-        // cTokenA = await CERC20.deploy(
-        //     tokenA.address,
-        //     comptroller.address,
-        //     interestRateModel.address,
-        //     changeRate,
-        //     nameA,
-        //     symbolA,
-        //     decimals,
-        //     owner.address
-        // );
+        await unitroller._setPendingImplementation(comptroller.address);
+        await unitroller._acceptImplementation();
 
-        // cTokenB = await CERC20.deploy(
-        //     tokenB.address,
-        //     comptroller.address,
-        //     interestRateModel.address,
-        //     changeRate,
-        //     nameB,
-        //     symbolB,
-        //     decimals,
-        //     owner.address
-        // );
+        await comptroller._become(unitroller.address);
+        comptroller = await Comptroller.attach(unitroller.address);
 
+        // create cTokenA & cTokenB
         let CERC20 = await ethers.getContractFactory("CErc20Delegate");
         let cerc20 = await CERC20.deploy();
         let delegator = await ethers.getContractFactory("CErc20Delegator");
@@ -103,20 +92,16 @@ describe("CErc20", async () => {
             expect(await cTokenA.decimals()).to.eq(decimals);
         });
 
-        it("set unitroller", async () => {
-            await unitroller._setPendingImplementation(comptroller.address);
-            await unitroller._acceptImplementation();
-
-            await comptroller._become(unitroller.address);
-        });
-
         it("admin set oracle & comptroller", async () => {
             //set oracle first, otherwise comptroller._setCollateralFactor will revert
             await oracle.setUnderlyingPrice(cTokenA.address, tokenAPrice);
+
             //support market
             await comptroller._supportMarket(cTokenA.address);
+
             //set oracle
             await comptroller._setPriceOracle(oracle.address);
+
             //set collateral
             await comptroller._setCollateralFactor(
                 cTokenA.address,
@@ -132,7 +117,7 @@ describe("CErc20", async () => {
             //approve
             await tokenA.approve(cTokenA.address, tokenAmount);
             //enterMarkets
-            await comptroller.enterMarkets([cTokenA.address]);
+            // await comptroller.enterMarkets([cTokenA.address]);
         });
 
         it("mint CErc20", async () => {

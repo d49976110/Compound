@@ -777,15 +777,15 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             console.log("collateral factor",vars.collateralFactor.mantissa);
             console.log("exchange rate",vars.exchangeRate.mantissa);
             console.log("tokens to denom",vars.tokensToDenom.mantissa);
+            console.log("cToken balance",vars.cTokenBalance/1e18);
+            console.log("pre sum collateral",vars.sumCollateral);
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
-            console.log("cToken balance",vars.cTokenBalance/1e18);
             console.log("sum collateral",vars.sumCollateral);
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
             console.log("borrow balance",vars.borrowBalance);
             console.log("sum borrow plus effects",vars.sumBorrowPlusEffects);
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
-            console.log("after sum borrow plus effects",vars.sumBorrowPlusEffects);
             // Calculate effects of interacting with cTokenModify
             
             //如果是當前的token，則需要將此次操作的redeem或是borrow加入到sumBorrowPlusEffects
@@ -799,6 +799,8 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, borrowAmount, vars.sumBorrowPlusEffects);
             }
         }
+        console.log("vars.sumCollateral",vars.sumCollateral);
+        console.log("vars.sumBorrowPlusEffects",vars.sumBorrowPlusEffects);
         // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             //如果總抵押大於借款，則返回0 => 代表沒有shortfall
