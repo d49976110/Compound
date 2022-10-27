@@ -676,9 +676,9 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 account liquidity in excess of collateral requirements,
      *          account shortfall below collateral requirements)
      */
+    //用戶可抵押的資產，返回的為總資產價格
     function getAccountLiquidity(address account) public view returns (uint, uint, uint) {
         (Error err, uint liquidity, uint shortfall) = getHypotheticalAccountLiquidityInternal(account, CToken(address(0)), 0, 0);
-
         return (uint(err), liquidity, shortfall);
     }
 

@@ -3,13 +3,15 @@ const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("CErc20", async () => {
-    let erc20, cerc20, comptroller, interestRateModel, oracle;
+    let tokenA, cerc20, comptroller, interestRateModel, oracle;
 
+    let Erc20mintamount = BigInt(1000 * 1e18);
     let supplyAmount = BigInt(100 * 1e18);
+    let borrowAmount = BigInt(90 * 1e18);
 
     let decimals = 18;
-    let name = "Compound ETH";
-    let symbol = "CWETH";
+    let nameA = "CTokenA";
+    let symbolA = "CTA";
     // change rate = 1:1
     let changeRate = BigInt(1 * 1e18);
     let underlyingOraclePrice = 20;
@@ -18,8 +20,8 @@ describe("CErc20", async () => {
     before(async () => {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-        let Erc20 = await ethers.getContractFactory("WETH");
-        erc20 = await Erc20.deploy();
+        let Erc20 = await ethers.getContractFactory("ERC20_custom");
+        tokenA = await Erc20.deploy("TokenA", "TOA");
 
         let InterestRateModel = await ethers.getContractFactory("InterestRate");
         interestRateModel = await InterestRateModel.deploy();
@@ -32,20 +34,20 @@ describe("CErc20", async () => {
 
         let CERC20 = await ethers.getContractFactory("CErc20Immutable");
         cerc20 = await CERC20.deploy(
-            erc20.address,
+            tokenA.address,
             comptroller.address,
             interestRateModel.address,
             changeRate,
-            name,
-            symbol,
+            nameA,
+            symbolA,
             decimals,
             owner.address
         );
     });
 
-    describe("settings", async () => {
+    describe("Settings", async () => {
         it("ERC20 & CERC20 decimals should be 18", async () => {
-            expect(await erc20.decimals()).to.eq(decimals);
+            expect(await tokenA.decimals()).to.eq(decimals);
             expect(await cerc20.decimals()).to.eq(decimals);
         });
 
@@ -67,12 +69,12 @@ describe("CErc20", async () => {
         });
     });
 
-    describe("mint & redeem", async () => {
+    describe("Mint & Redeem", async () => {
         it("mint & approve ERC20", async () => {
             //mint
-            await erc20.mint(supplyAmount);
+            await tokenA.mint(Erc20mintamount);
             //approve
-            await erc20.approve(cerc20.address, supplyAmount);
+            await tokenA.approve(cerc20.address, Erc20mintamount);
             //enterMarkets
             await comptroller.enterMarkets([cerc20.address]);
         });
@@ -85,6 +87,22 @@ describe("CErc20", async () => {
         it("redeem Erc20", async () => {
             await cerc20.redeem(supplyAmount);
             expect(await cerc20.balanceOf(owner.address)).to.eq(0);
+        });
+    });
+
+    describe("Borrow & Repay", async () => {
+        it("approve Erc20 and mint CErc20 first", async () => {
+            await cerc20.mint(supplyAmount);
+            expect(await cerc20.balanceOf(owner.address)).to.eq(supplyAmount);
+        });
+        it("borrow", async () => {
+            await cerc20.borrow(borrowAmount);
+            expect(
+                await cerc20.callStatic.borrowBalanceCurrent(owner.address)
+            ).to.eq(borrowAmount);
+        });
+        it("repay", async () => {
+            await cerc20.repayBorrow(borrowAmount);
         });
     });
 });

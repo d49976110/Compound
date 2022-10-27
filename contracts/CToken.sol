@@ -234,6 +234,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      */
     function borrowBalanceCurrent(address account) override external nonReentrant returns (uint) {
         accrueInterest();
+        console.log("borrowBalanceStored(account)",borrowBalanceStored(account));
         return borrowBalanceStored(account);
     }
 
