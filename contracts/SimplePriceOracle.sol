@@ -19,7 +19,6 @@ contract SimplePriceOracle is PriceOracle {
     }
 
     function getUnderlyingPrice(CToken cToken) public override view returns (uint) {
-        console.log("oracle ctoken", address(cToken));
         return prices[_getUnderlyingAddress(cToken)];
     }
 

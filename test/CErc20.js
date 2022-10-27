@@ -12,7 +12,7 @@ describe("CErc20", async () => {
     let symbol = "CWETH";
     // change rate = 1:1
     let changeRate = BigInt(1 * 1e18);
-    let underlyingPrice = 100;
+    let underlyingOraclePrice = 20;
     let collateralFactor = BigInt(0.9 * 1e18);
 
     before(async () => {
@@ -29,9 +29,7 @@ describe("CErc20", async () => {
 
         let Oracle = await ethers.getContractFactory("SimplePriceOracle");
         oracle = await Oracle.deploy();
-    });
 
-    it("deploy CErc20", async function () {
         let CERC20 = await ethers.getContractFactory("CErc20Immutable");
         cerc20 = await CERC20.deploy(
             erc20.address,
@@ -45,52 +43,48 @@ describe("CErc20", async () => {
         );
     });
 
-    it("ERC20 & CERC20 decimals should be 18", async () => {
-        expect(await erc20.decimals()).to.eq(decimals);
-        expect(await cerc20.decimals()).to.eq(decimals);
+    describe("settings", async () => {
+        it("ERC20 & CERC20 decimals should be 18", async () => {
+            expect(await erc20.decimals()).to.eq(decimals);
+            expect(await cerc20.decimals()).to.eq(decimals);
+        });
+
+        it("set oracle & comptroller", async () => {
+            //set oracle first, otherwise comptroller._setCollateralFactor will revert
+            await oracle.setUnderlyingPrice(
+                cerc20.address,
+                underlyingOraclePrice
+            );
+            //support market
+            await comptroller._supportMarket(cerc20.address);
+            //set oracle
+            await comptroller._setPriceOracle(oracle.address);
+            //set collateral
+            await comptroller._setCollateralFactor(
+                cerc20.address,
+                collateralFactor
+            );
+        });
     });
 
-    it("set oracle & comptroller", async () => {
-        //set oracle first or comptroller._setCollateralFactor will revert
-        await oracle.setUnderlyingPrice(cerc20.address, underlyingPrice);
-        //support market
-        await comptroller._supportMarket(cerc20.address);
-        //set oracle
-        await comptroller._setPriceOracle(oracle.address);
-        //set collateral
-        await comptroller._setCollateralFactor(cerc20.address, collateralFactor);
-    });
+    describe("mint & redeem", async () => {
+        it("mint & approve ERC20", async () => {
+            //mint
+            await erc20.mint(supplyAmount);
+            //approve
+            await erc20.approve(cerc20.address, supplyAmount);
+            //enterMarkets
+            await comptroller.enterMarkets([cerc20.address]);
+        });
 
-    it("mint & approve ERC20", async () => {
-        //mint
-        await erc20.mint(supplyAmount);
-        //approve
-        await erc20.approve(cerc20.address, supplyAmount);
-        //enterMarkets
-        await comptroller.enterMarkets([cerc20.address]);
+        it("mint CErc20", async () => {
+            await cerc20.mint(supplyAmount);
+            expect(await cerc20.balanceOf(owner.address)).to.eq(supplyAmount);
+        });
 
-        //mint
-        await erc20.connect(addr1).mint(supplyAmount);
-        //approve
-        await erc20.connect(addr1).approve(cerc20.address, supplyAmount);
-        //enterMarkets
-        await comptroller.connect(addr1).enterMarkets([cerc20.address]);
-
-        // expect(await comptroller.getAssetsIn(addr1.address)).to.eq(cerc20.address);
-    });
-
-    it("mint CErc20", async () => {
-        await cerc20.mint(supplyAmount);
-        expect(await cerc20.balanceOf(owner.address)).to.eq(supplyAmount);
-
-        await cerc20.connect(addr1).mint(supplyAmount);
-        expect(await cerc20.balanceOf(addr1.address)).to.eq(supplyAmount);
-    });
-
-    it("redeem Erc20", async () => {
-        await cerc20.redeem(supplyAmount);
-        console.log("erc20 balance", await erc20.balanceOf(owner.address));
-
-        expect(await cerc20.balanceOf(owner.address)).to.eq(0);
+        it("redeem Erc20", async () => {
+            await cerc20.redeem(supplyAmount);
+            expect(await cerc20.balanceOf(owner.address)).to.eq(0);
+        });
     });
 });

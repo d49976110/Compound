@@ -730,13 +730,12 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         CToken cTokenModify,
         uint redeemTokens,
         uint borrowAmount) internal view returns (Error, uint, uint) {
-        
         //防止stack too deep所設置的struct
         AccountLiquidityLocalVars memory vars; // Holds all our calculation results
         uint oErr;
         
         // For each asset the account is in
-        //取得用戶所有借款資產
+        //取得用戶所有有entermaket的資產
         CToken[] memory assets = accountAssets[account];
 
         for (uint i = 0; i < assets.length; i++) {
@@ -759,28 +758,32 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             */
             //需要先設定該token的collateralFactor
             vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});
-            console.log("vars.collateralFactor",vars.collateralFactor.mantissa);
+            
             vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
-            console.log("vars.exchangeRate",vars.exchangeRate.mantissa);
+            
             
             //從oracle中取得該token的報價，並計算總抵押資產價值，與總借款加上此次贖回或是借款，是否有超過抵押資產的價值
             vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
-            console.log("--- Oracle ---");
+            console.log("--- oracle for 1 knid of token ---");
             // 跟oraclePriceMantissa，只是整理格式
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
             console.log("oracle price: ",vars.oraclePrice.mantissa);
-            // Pre-compute a conversion factor from tokens -> ether (normalized price value)
+            // tokensToDenom = collateralFactor * exchangeRate * oraclePrice / 1e18 / 1e18
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
-            console.log("vars.tokensToDenom",vars.tokensToDenom.mantissa);
+            console.log("collateral factor",vars.collateralFactor.mantissa);
+            console.log("exchange rate",vars.exchangeRate.mantissa);
+            console.log("tokens to denom",vars.tokensToDenom.mantissa);
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
-            console.log("vars.sumCollateral",vars.sumCollateral);
+            console.log("cToken balance",vars.cTokenBalance/1e18);
+            console.log("sum collateral",vars.sumCollateral);
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
-            console.log("vars.sumBorrowPlusEffects",vars.sumBorrowPlusEffects);
+            console.log("borrow balance",vars.borrowBalance);
+            console.log("sum borrow plus effects",vars.sumBorrowPlusEffects);
             // Calculate effects of interacting with cTokenModify
             
             //如果是當前的token，則需要將此次操作的redeem或是borrow加入到sumBorrowPlusEffects
