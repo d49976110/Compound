@@ -95,13 +95,10 @@ describe("CErc20", async () => {
         it("admin set oracle & comptroller", async () => {
             //set oracle first, otherwise comptroller._setCollateralFactor will revert
             await oracle.setUnderlyingPrice(cTokenA.address, tokenAPrice);
-
             //support market
             await comptroller._supportMarket(cTokenA.address);
-
             //set oracle
             await comptroller._setPriceOracle(oracle.address);
-
             //set collateral
             await comptroller._setCollateralFactor(
                 cTokenA.address,
@@ -116,8 +113,6 @@ describe("CErc20", async () => {
             await tokenA.mint(tokenAmount);
             //approve
             await tokenA.approve(cTokenA.address, tokenAmount);
-            //enterMarkets
-            // await comptroller.enterMarkets([cTokenA.address]);
         });
 
         it("mint CErc20", async () => {
@@ -132,7 +127,7 @@ describe("CErc20", async () => {
     });
 
     describe("Borrow & Repay", async () => {
-        it("set comptroller & oracle", async () => {
+        it("set cTokenB comptroller & oracle", async () => {
             await oracle.setUnderlyingPrice(cTokenB.address, tokenBPrice);
             await comptroller._supportMarket(cTokenB.address);
             await comptroller._setCollateralFactor(
@@ -141,30 +136,37 @@ describe("CErc20", async () => {
             );
         });
 
-        it("mint approve Erc20 and mint CErc20 first", async () => {
+        it("addr1 supply some tokenA for cTokenA", async () => {
+            await tokenA.connect(addr1).mint(supplyAmount);
+            await tokenA.connect(addr1).approve(cTokenA.address, supplyAmount);
+            await cTokenA.connect(addr1).mint(supplyAmount);
+            expect(await cTokenA.balanceOf(addr1.address)).to.eq(supplyAmount);
+        });
+
+        it("owner mint approve tokenB and mint cTokenB first", async () => {
             await tokenB.mint(tokenBmount);
             await tokenB.approve(cTokenB.address, tokenBmount);
             await cTokenB.mint(tokenBmount);
             expect(await cTokenB.balanceOf(owner.address)).to.eq(tokenBmount);
         });
 
-        it("enter markets", async () => {
+        it("enter ctokenB to markets", async () => {
             await comptroller.enterMarkets([cTokenB.address]);
         });
 
-        it("supply some A token", async () => {
-            await cTokenA.mint(supplyAmount);
-        });
-
-        it("borrow", async () => {
+        it("borrow tokenA", async () => {
             await cTokenA.borrow(borrowAFromBAmount);
             expect(
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
             ).to.eq(borrowAFromBAmount);
         });
 
-        it("repay", async () => {
+        it("repay tokenA to contract", async () => {
+            let balance = await tokenA.balanceOf(owner.address);
             await cTokenA.repayBorrow(borrowAFromBAmount);
+            expect(await tokenA.balanceOf(owner.address)).to.eq(
+                BigInt(Number(balance) - Number(borrowAFromBAmount))
+            );
         });
     });
 });
