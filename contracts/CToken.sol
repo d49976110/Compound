@@ -595,6 +595,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
     function borrowFresh(address payable borrower, uint borrowAmount) internal {
         /* Fail if borrow not allowed */
         uint allowed = comptroller.borrowAllowed(address(this), borrower, borrowAmount);
+        
         if (allowed != 0) {
             revert BorrowComptrollerRejection(allowed);
         }
@@ -603,7 +604,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         if (accrualBlockNumber != getBlockNumber()) {
             revert BorrowFreshnessCheck();
         }
-
+    
         /* Fail gracefully if protocol has insufficient underlying cash */
         if (getCashPrior() < borrowAmount) {
             revert BorrowCashNotAvailable();
