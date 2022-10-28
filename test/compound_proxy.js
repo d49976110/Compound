@@ -25,6 +25,10 @@ describe("CErc20", async () => {
     let collateralFactorB = BigInt(0.5 * 1e18);
     let chagnedCollateralFactorB = BigInt(0.4 * 1e18);
 
+    //liquidate factor
+    let closeFactor = BigInt(0.5 * 1e18);
+    let liquidationIncentive = BigInt(1.08 * 1e18);
+
     before(async () => {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
@@ -183,7 +187,7 @@ describe("CErc20", async () => {
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
             ).to.eq(borrowAmount_A_from_B);
 
-            //set collateranl factor
+            //set collateranl factor & close factor & liquidation Iincentive
             await comptroller._setCollateralFactor(
                 cTokenB.address,
                 chagnedCollateralFactorB
@@ -193,10 +197,59 @@ describe("CErc20", async () => {
             expect(markets.collateralFactorMantissa).to.eq(
                 chagnedCollateralFactorB
             );
+
+            await comptroller._setCloseFactor(closeFactor);
+            expect(await comptroller.closeFactorMantissa()).to.eq(closeFactor);
+
+            await comptroller._setLiquidationIncentive(liquidationIncentive);
+            expect(await comptroller.liquidationIncentiveMantissa()).to.eq(
+                liquidationIncentive
+            );
+
             // liquidity should = 0 && short fall should > 0
             let result = await comptroller.getAccountLiquidity(owner.address);
             expect(result[1]).to.eq(0);
             expect(result[2]).to.gt(0);
+
+            //addr1 mint & approve token A
+            await tokenA.connect(addr1).mint(tokenAmount);
+            expect(await tokenA.balanceOf(addr1.address)).to.eq(tokenAmount);
+            await tokenA.connect(addr1).approve(cTokenA.address, tokenAmount);
+            expect(
+                await tokenA.allowance(addr1.address, cTokenA.address)
+            ).to.eq(tokenAmount);
+
+            //get info
+
+            let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
+                owner.address
+            );
+
+            let repayAmount =
+                (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
+
+            let liquidatedCtokenAmount = await comptroller
+                .connect(addr1)
+                .liquidateCalculateSeizeTokens(
+                    cTokenA.address,
+                    cTokenB.address,
+                    repayAmount
+                );
+
+            console.log("liquidatedCtokenAmount", liquidatedCtokenAmount);
+            console.log(
+                "ctokenB balance",
+                await cTokenB.balanceOf(addr1.address)
+            );
+            //協助償還借貸資產，第一個參數為被清算人，第二為協助清算資產數量，第三個為抵押資產的cToken地址
+            //liquidate
+            await cTokenA
+                .connect(addr1)
+                .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
+            console.log(
+                "after ctokenB balance",
+                await cTokenB.balanceOf(addr1.address)
+            );
         });
     });
 

@@ -304,7 +304,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         //需要用oracle來計算當前總資產與總負債
         /* Otherwise, perform a hypothetical liquidity check to guard against shortfall */
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, CToken(cToken), redeemTokens, 0);
-        console.log("no shortfall");
+        
         if (err != Error.NO_ERROR) {
             return uint(err);
         }
@@ -488,11 +488,12 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         }
 
         uint borrowBalance = CToken(cTokenBorrowed).borrowBalanceStored(borrower);
-
+        
         /* allow accounts to be liquidated if the market is deprecated */
         if (isDeprecated(CToken(cTokenBorrowed))) {
             require(borrowBalance >= repayAmount, "Can not repay more than the total borrow");
         } else {
+            
             /* The borrower must have shortfall in order to be liquidatable */
             (Error err, , uint shortfall) = getAccountLiquidityInternal(borrower);
             if (err != Error.NO_ERROR) {
@@ -502,9 +503,10 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             if (shortfall == 0) {
                 return uint(Error.INSUFFICIENT_SHORTFALL);
             }
-
+            
             /* The liquidator may not repay more than what is allowed by the closeFactor */
             uint maxClose = mul_ScalarTruncate(Exp({mantissa: closeFactorMantissa}), borrowBalance);
+            
             if (repayAmount > maxClose) {
                 return uint(Error.TOO_MUCH_REPAY);
             }
@@ -768,23 +770,18 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
-            console.log("--- oracle for 1 knid of token ---");
+
             // 跟oraclePriceMantissa，只是整理格式
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
-            console.log("oracle price: ",vars.oraclePrice.mantissa);
+            
+            // tokensToDenom:代表該token的面額
             // tokensToDenom = collateralFactor * exchangeRate * oraclePrice / 1e18 / 1e18
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
-            console.log("collateral factor",vars.collateralFactor.mantissa);
-            console.log("exchange rate",vars.exchangeRate.mantissa);
-            console.log("tokens to denom",vars.tokensToDenom.mantissa);
-            console.log("cToken balance",vars.cTokenBalance/1e18);
-            console.log("pre sum collateral",vars.sumCollateral);
+            
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
-            console.log("sum collateral",vars.sumCollateral);
+            
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
-            console.log("borrow balance",vars.borrowBalance);
-            console.log("sum borrow plus effects",vars.sumBorrowPlusEffects);
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
             // Calculate effects of interacting with cTokenModify
             
@@ -799,8 +796,8 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, borrowAmount, vars.sumBorrowPlusEffects);
             }
         }
-        console.log("vars.sumCollateral",vars.sumCollateral);
-        console.log("vars.sumBorrowPlusEffects",vars.sumBorrowPlusEffects);
+        console.log("sum collateral",vars.sumCollateral);
+        console.log("sum borrow plus effects",vars.sumBorrowPlusEffects);
         // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             //如果總抵押大於借款，則返回0 => 代表沒有shortfall
@@ -820,8 +817,10 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      */
     function liquidateCalculateSeizeTokens(address cTokenBorrowed, address cTokenCollateral, uint actualRepayAmount) override external view returns (uint, uint) {
         /* Read oracle prices for borrowed and collateral markets */
+        
         uint priceBorrowedMantissa = oracle.getUnderlyingPrice(CToken(cTokenBorrowed));
         uint priceCollateralMantissa = oracle.getUnderlyingPrice(CToken(cTokenCollateral));
+        
         if (priceBorrowedMantissa == 0 || priceCollateralMantissa == 0) {
             return (uint(Error.PRICE_ERROR), 0);
         }
@@ -838,12 +837,18 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         Exp memory denominator;
         Exp memory ratio;
 
+        console.log("liquidationIncentiveMantissa",liquidationIncentiveMantissa);
+        console.log("priceBorrowedMantissa",priceBorrowedMantissa);
         numerator = mul_(Exp({mantissa: liquidationIncentiveMantissa}), Exp({mantissa: priceBorrowedMantissa}));
         denominator = mul_(Exp({mantissa: priceCollateralMantissa}), Exp({mantissa: exchangeRateMantissa}));
+        console.log("numerator",numerator.mantissa);
+        console.log("denominator",denominator.mantissa);
         ratio = div_(numerator, denominator);
 
+        console.log("actualRepayAmount",actualRepayAmount);
+        console.log("ratio",ratio.mantissa);
         seizeTokens = mul_ScalarTruncate(ratio, actualRepayAmount);
-
+        console.log("seizeTokens",seizeTokens);
         return (uint(Error.NO_ERROR), seizeTokens);
     }
 
