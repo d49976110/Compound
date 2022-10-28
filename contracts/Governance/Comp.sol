@@ -241,6 +241,7 @@ contract Comp {
         _moveDelegates(delegates[src], delegates[dst], amount);
     }
 
+    // srcRep: pre delegatee  dstRep:delegatee
     function _moveDelegates(address srcRep, address dstRep, uint96 amount) internal {
         if (srcRep != dstRep && amount > 0) {
             if (srcRep != address(0)) {

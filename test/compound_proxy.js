@@ -10,7 +10,7 @@ describe("CErc20", async () => {
     let supplyAmount = BigInt(100 * 1e18);
 
     let tokenBmount = BigInt(1 * 1e18);
-    let borrowAFromBAmount = BigInt(50 * 1e18);
+    let borrowAmount_A_from_B = BigInt(50 * 1e18);
 
     let decimals = 18;
     let nameA = "CTokenA";
@@ -23,6 +23,7 @@ describe("CErc20", async () => {
     let tokenBPrice = BigInt(100 * 1e18);
     let collateralFactorA = BigInt(0.9 * 1e18);
     let collateralFactorB = BigInt(0.5 * 1e18);
+    let chagnedCollateralFactorB = BigInt(0.4 * 1e18);
 
     before(async () => {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
@@ -155,18 +156,49 @@ describe("CErc20", async () => {
         });
 
         it("borrow tokenA", async () => {
-            await cTokenA.borrow(borrowAFromBAmount);
+            await cTokenA.borrow(borrowAmount_A_from_B);
             expect(
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
-            ).to.eq(borrowAFromBAmount);
+            ).to.eq(borrowAmount_A_from_B);
         });
 
         it("repay tokenA to contract", async () => {
             let balance = await tokenA.balanceOf(owner.address);
-            await cTokenA.repayBorrow(borrowAFromBAmount);
+            await cTokenA.repayBorrow(borrowAmount_A_from_B);
             expect(await tokenA.balanceOf(owner.address)).to.eq(
-                BigInt(Number(balance) - Number(borrowAFromBAmount))
+                BigInt(Number(balance) - Number(borrowAmount_A_from_B))
             );
+
+            //liquidity should grater than 0
+            let result = await comptroller.getAccountLiquidity(owner.address);
+            expect(result[1]).to.gt(0);
         });
     });
+
+    describe("liquidate", async () => {
+        it("change collateral factor", async () => {
+            // borrow again
+            await cTokenA.borrow(borrowAmount_A_from_B);
+            expect(
+                await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
+            ).to.eq(borrowAmount_A_from_B);
+
+            //set collateranl factor
+            await comptroller._setCollateralFactor(
+                cTokenB.address,
+                chagnedCollateralFactorB
+            );
+
+            let markets = await comptroller.markets(cTokenB.address);
+            expect(markets.collateralFactorMantissa).to.eq(
+                chagnedCollateralFactorB
+            );
+            // liquidity should = 0 && short fall should > 0
+            let result = await comptroller.getAccountLiquidity(owner.address);
+            expect(result[1]).to.eq(0);
+            expect(result[2]).to.gt(0);
+        });
+    });
+
+    // describe("liquidate", async () => {});
 });
