@@ -110,6 +110,10 @@ describe("CErc20", async () => {
                 cTokenA.address,
                 collateralFactorA
             );
+            // set close factor
+            await comptroller._setCloseFactor(closeFactor);
+            // set liquidation incentive
+            await comptroller._setLiquidationIncentive(liquidationIncentive);
         });
     });
 
@@ -180,14 +184,14 @@ describe("CErc20", async () => {
         });
     });
 
-    describe("Liquidate", async () => {
+    describe("Liquidate_change colletaral factor", async () => {
         it("borrow", async () => {
             await cTokenA.borrow(borrowAmount_A_from_B);
             expect(
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
             ).to.eq(borrowAmount_A_from_B);
         });
-        it("set collateranl factor & close factor & liquidation Iincentive", async () => {
+        it("change collateranl factor", async () => {
             await comptroller._setCollateralFactor(
                 cTokenB.address,
                 chagnedCollateralFactorB
@@ -196,14 +200,6 @@ describe("CErc20", async () => {
             let markets = await comptroller.markets(cTokenB.address);
             expect(markets.collateralFactorMantissa).to.eq(
                 chagnedCollateralFactorB
-            );
-
-            await comptroller._setCloseFactor(closeFactor);
-            expect(await comptroller.closeFactorMantissa()).to.eq(closeFactor);
-
-            await comptroller._setLiquidationIncentive(liquidationIncentive);
-            expect(await comptroller.liquidationIncentiveMantissa()).to.eq(
-                liquidationIncentive
             );
         });
 
