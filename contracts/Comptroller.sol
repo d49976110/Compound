@@ -766,7 +766,9 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             
             
             //從oracle中取得該token的報價，並計算總抵押資產價值，與總借款加上此次贖回或是借款，是否有超過抵押資產的價值
+            
             vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
+            
             if (vars.oraclePriceMantissa == 0) {
                 return (Error.PRICE_ERROR, 0, 0);
             }
@@ -774,11 +776,11 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             // 跟oraclePriceMantissa，只是整理格式
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
             
-            // tokensToDenom:代表該token的面額
+            // tokensToDenom:代表該ctoken的面額
             // tokensToDenom = collateralFactor * exchangeRate * oraclePrice / 1e18 / 1e18
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
             
-            // sumCollateral += tokensToDenom * cTokenBalance
+            // sumCollateral += tokensToDenom * cTokenBalance ，可以把它想成是 token(cToken * exchangeRate) * collateralfactor * oraclePrice
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
             
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
@@ -796,8 +798,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, borrowAmount, vars.sumBorrowPlusEffects);
             }
         }
-        console.log("sum collateral",vars.sumCollateral);
-        console.log("sum borrow plus effects",vars.sumBorrowPlusEffects);
+
         // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             //如果總抵押大於借款，則返回0 => 代表沒有shortfall
@@ -837,18 +838,12 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         Exp memory denominator;
         Exp memory ratio;
 
-        console.log("liquidationIncentiveMantissa",liquidationIncentiveMantissa);
-        console.log("priceBorrowedMantissa",priceBorrowedMantissa);
         numerator = mul_(Exp({mantissa: liquidationIncentiveMantissa}), Exp({mantissa: priceBorrowedMantissa}));
         denominator = mul_(Exp({mantissa: priceCollateralMantissa}), Exp({mantissa: exchangeRateMantissa}));
-        console.log("numerator",numerator.mantissa);
-        console.log("denominator",denominator.mantissa);
+        
         ratio = div_(numerator, denominator);
-
-        console.log("actualRepayAmount",actualRepayAmount);
-        console.log("ratio",ratio.mantissa);
         seizeTokens = mul_ScalarTruncate(ratio, actualRepayAmount);
-        console.log("seizeTokens",seizeTokens);
+
         return (uint(Error.NO_ERROR), seizeTokens);
     }
 

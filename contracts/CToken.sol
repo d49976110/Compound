@@ -499,8 +499,6 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         /* exchangeRate = invoke Exchange Rate Stored() */
         // 如果質押後，並沒有人借款，則exchange rate不會變
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal() });
-        console.log("------- redeem -------");
-        console.log("exchange rate: ",exchangeRate.mantissa);
         uint redeemTokens;
         uint redeemAmount;
         /* If redeemTokensIn > 0: */
@@ -510,12 +508,12 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
              *  redeemTokens = redeemTokensIn
              *  redeemAmount = redeemTokensIn x exchangeRateCurrent
              */
-            redeemTokens = redeemTokensIn;
-            console.log("redeem CErc20 token in",redeemTokensIn);
+            redeemTokens = redeemTokensIn;      
+            
             // exchangeRate * redeemTokensIn / 1e18
             // 要贖回的ERC20 數量
             redeemAmount = mul_ScalarTruncate(exchangeRate, redeemTokensIn);
-            console.log("redeem Erc20 token out",redeemAmount);
+            
         } else {
             /*
              * We get the current exchange rate and calculate the amount to be redeemed:
@@ -775,14 +773,16 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         }
 
         /* Fail if repayBorrow fails */
+        // transferIn
         uint actualRepayAmount = repayBorrowFresh(liquidator, borrower, repayAmount);
-
+        
         /////////////////////////
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
 
         /* We calculate the number of collateral tokens that will be seized */
         (uint amountSeizeError, uint seizeTokens) = comptroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
+
         require(amountSeizeError == NO_ERROR, "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED");
 
         /* Revert if borrower collateral token balance < seizeTokens */

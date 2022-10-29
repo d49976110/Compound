@@ -18,7 +18,8 @@ describe("CErc20", async () => {
     let nameB = "CTokenB";
     let symbolB = "CTB";
     // change rate = 1:1
-    let changeRate = BigInt(1 * 1e18);
+    let changeRateA = BigInt(1 * 1e18);
+    let changeRateB = BigInt(1 * 1e18);
     let tokenAPrice = BigInt(1 * 1e18);
     let tokenBPrice = BigInt(100 * 1e18);
     let collateralFactorA = BigInt(0.9 * 1e18);
@@ -69,7 +70,7 @@ describe("CErc20", async () => {
             tokenA.address,
             comptroller.address,
             interestRateModel.address,
-            changeRate,
+            changeRateA,
             nameA,
             symbolA,
             decimals,
@@ -81,7 +82,7 @@ describe("CErc20", async () => {
             tokenB.address,
             comptroller.address,
             interestRateModel.address,
-            changeRate,
+            changeRateB,
             nameB,
             symbolB,
             decimals,
@@ -179,15 +180,14 @@ describe("CErc20", async () => {
         });
     });
 
-    describe("liquidate", async () => {
-        it("change collateral factor", async () => {
-            // borrow again
+    describe("Liquidate", async () => {
+        it("borrow", async () => {
             await cTokenA.borrow(borrowAmount_A_from_B);
             expect(
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
             ).to.eq(borrowAmount_A_from_B);
-
-            //set collateranl factor & close factor & liquidation Iincentive
+        });
+        it("set collateranl factor & close factor & liquidation Iincentive", async () => {
             await comptroller._setCollateralFactor(
                 cTokenB.address,
                 chagnedCollateralFactorB
@@ -205,22 +205,22 @@ describe("CErc20", async () => {
             expect(await comptroller.liquidationIncentiveMantissa()).to.eq(
                 liquidationIncentive
             );
+        });
 
-            // liquidity should = 0 && short fall should > 0
-            let result = await comptroller.getAccountLiquidity(owner.address);
-            expect(result[1]).to.eq(0);
-            expect(result[2]).to.gt(0);
-
-            //addr1 mint & approve token A
+        it("addr1 mint & approve token A", async () => {
             await tokenA.connect(addr1).mint(tokenAmount);
             expect(await tokenA.balanceOf(addr1.address)).to.eq(tokenAmount);
             await tokenA.connect(addr1).approve(cTokenA.address, tokenAmount);
             expect(
                 await tokenA.allowance(addr1.address, cTokenA.address)
             ).to.eq(tokenAmount);
-
-            //get info
-
+        });
+        it("liquidity should = 0 && short fall should > 0", async () => {
+            let result = await comptroller.getAccountLiquidity(owner.address);
+            expect(result[1]).to.eq(0);
+            expect(result[2]).to.gt(0);
+        });
+        it("liquidate", async () => {
             let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
                 owner.address
             );
@@ -228,30 +228,11 @@ describe("CErc20", async () => {
             let repayAmount =
                 (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
-            let liquidatedCtokenAmount = await comptroller
-                .connect(addr1)
-                .liquidateCalculateSeizeTokens(
-                    cTokenA.address,
-                    cTokenB.address,
-                    repayAmount
-                );
-
-            console.log("liquidatedCtokenAmount", liquidatedCtokenAmount);
-            console.log(
-                "ctokenB balance",
-                await cTokenB.balanceOf(addr1.address)
-            );
-            //協助償還借貸資產，第一個參數為被清算人，第二為協助清算資產數量，第三個為抵押資產的cToken地址
+            //協助償還借貸資產，到借出的cToken合約，執行liquidateBorrow，第一個參數為被清算人，第二為協助清算資產數量，第三個為抵押資產的cToken地址
             //liquidate
             await cTokenA
                 .connect(addr1)
                 .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
-            console.log(
-                "after ctokenB balance",
-                await cTokenB.balanceOf(addr1.address)
-            );
         });
     });
-
-    // describe("liquidate", async () => {});
 });
