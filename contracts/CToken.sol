@@ -408,15 +408,14 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      * @param minter The address of the account which is supplying the assets
      * @param mintAmount The amount of the underlying asset to supply
      */
+    //mintFresh
     function mintFresh(address minter, uint mintAmount) internal {
-        /* Fail if mint not allowed */
         uint allowed = comptroller.mintAllowed(address(this), minter, mintAmount);
 
         if (allowed != 0) {
             revert MintComptrollerRejection(allowed);
         }
 
-        /* Verify market's block number equals current block number */
         //因為每次都會執行accrueInterest，就會更新區塊高度，所以會一致
         if (accrualBlockNumber != getBlockNumber()) {
             revert MintFreshnessCheck();
@@ -424,43 +423,17 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         //取得當下的changeRate，透過exchangeRateStoredInternal即時計算
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
 
-        /////////////////////////
-        // EFFECTS & INTERACTIONS
-        // (No safe failures beyond this point)
-
-        /*
-         *  We call `doTransferIn` for the minter and the mintAmount.
-         *  Note: The cToken must handle variations between ERC-20 and ETH underlying.
-         *  `doTransferIn` reverts if anything goes wrong, since we can't be sure if
-         *  side-effects occurred. The function returns the amount actually transferred,
-         *  in case of a fee. On success, the cToken holds an additional `actualMintAmount`
-         *  of cash.
-         */
         //返回真的傳入合約的數量
         uint actualMintAmount = doTransferIn(minter, mintAmount);
-        
-        /*
-         * We get the current exchange rate and calculate the number of cTokens to be minted:
-         *  mintTokens = actualMintAmount / exchangeRate
-         */
+    
         //計算CErc20的數量，因為exchangeRate是放大1e18，所以actualMintAmount需要同步乘上1e18
         uint mintTokens = div_(actualMintAmount, exchangeRate);
-        /*  
-         * We calculate the new total supply of cTokens and minter token balance, checking for overflow:
-         *  totalSupplyNew = totalSupply + mintTokens
-         *  accountTokensNew = accountTokens[minter] + mintTokens
-         * And write them into storage
-         */
+        
         totalSupply = totalSupply + mintTokens;
         accountTokens[minter] = accountTokens[minter] + mintTokens;
 
-        /* We emit a Mint event, and a Transfer event */
         emit Mint(minter, actualMintAmount, mintTokens);
         emit Transfer(address(this), minter, mintTokens);
-
-        /* We call the defense hook */
-        // unused function
-        // comptroller.mintVerify(address(this), minter, actualMintAmount, mintTokens);
     }
 
     /**
@@ -493,21 +466,16 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      * @param redeemTokensIn The number of cTokens to redeem into underlying (only one of redeemTokensIn or redeemAmountIn may be non-zero)
      * @param redeemAmountIn The number of underlying tokens to receive from redeeming cTokens (only one of redeemTokensIn or redeemAmountIn may be non-zero)
      */
+    //redeemFresh
     function redeemFresh(address payable redeemer, uint redeemTokensIn, uint redeemAmountIn) internal {
         require(redeemTokensIn == 0 || redeemAmountIn == 0, "one of redeemTokensIn or redeemAmountIn must be zero");
 
-        /* exchangeRate = invoke Exchange Rate Stored() */
         // 如果質押後，並沒有人借款，則exchange rate不會變
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal() });
         uint redeemTokens;
         uint redeemAmount;
-        /* If redeemTokensIn > 0: */
+
         if (redeemTokensIn > 0) {
-            /*
-             * We calculate the exchange rate and the amount of underlying to be redeemed:
-             *  redeemTokens = redeemTokensIn
-             *  redeemAmount = redeemTokensIn x exchangeRateCurrent
-             */
             redeemTokens = redeemTokensIn;      
             
             // exchangeRate * redeemTokensIn / 1e18
@@ -515,57 +483,32 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
             redeemAmount = mul_ScalarTruncate(exchangeRate, redeemTokensIn);
             
         } else {
-            /*
-             * We get the current exchange rate and calculate the amount to be redeemed:
-             *  redeemTokens = redeemAmountIn / exchangeRate
-             *  redeemAmount = redeemAmountIn
-             */
             redeemTokens = div_(redeemAmountIn, exchangeRate);
             redeemAmount = redeemAmountIn;
         }
 
-        /* Fail if redeem not allowed */
         // 這邊會需要到comptroller，並使用到oracle
         uint allowed = comptroller.redeemAllowed(address(this), redeemer, redeemTokens);
         if (allowed != 0) {
             revert RedeemComptrollerRejection(allowed);
         }
 
-        /* Verify market's block number equals current block number */
         if (accrualBlockNumber != getBlockNumber()) {
             revert RedeemFreshnessCheck();
         }
 
-        /* Fail gracefully if protocol has insufficient cash */
         if (getCashPrior() < redeemAmount) {
             revert RedeemTransferOutNotPossible();
         }
 
-        /////////////////////////
-        // EFFECTS & INTERACTIONS
-        // (No safe failures beyond this point)
-
-
-        /*
-         * We write the previously calculated values into storage.
-         *  Note: Avoid token reentrancy attacks by writing reduced supply before external transfer.
-         */
         totalSupply = totalSupply - redeemTokens;
         accountTokens[redeemer] = accountTokens[redeemer] - redeemTokens;
 
-        /*
-         * We invoke doTransferOut for the redeemer and the redeemAmount.
-         *  Note: The cToken must handle variations between ERC-20 and ETH underlying.
-         *  On success, the cToken has redeemAmount less of cash.
-         *  doTransferOut reverts if anything goes wrong, since we can't be sure if side effects occurred.
-         */
         doTransferOut(redeemer, redeemAmount);
 
-        /* We emit a Transfer event, and a Redeem event */
         emit Transfer(redeemer, address(this), redeemTokens);
         emit Redeem(redeemer, redeemAmount, redeemTokens);
 
-        /* We call the defense hook */
         comptroller.redeemVerify(address(this), redeemer, redeemAmount, redeemTokens);
     }
 

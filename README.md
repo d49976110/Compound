@@ -2,5 +2,5 @@
 
 ```
 npm install
-npx hardhat test compound.js
+npx hardhat test test/compound.js
 ```

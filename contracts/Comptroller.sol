@@ -737,36 +737,20 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
         AccountLiquidityLocalVars memory vars; // Holds all our calculation results
         uint oErr;
         
-        // For each asset the account is in
         //取得用戶所有有entermaket的資產
         CToken[] memory assets = accountAssets[account];
 
+        //取得後便會遍歷該陣列，將每一個資產的可抵押價值加總，同時計算借款的總價值。
         for (uint i = 0; i < assets.length; i++) {
-            
             CToken asset = assets[i];
-
-            // Read the balances and exchange rate from the cToken
             (oErr, vars.cTokenBalance, vars.borrowBalance, vars.exchangeRateMantissa) = asset.getAccountSnapshot(account);
-            if (oErr != 0) { // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
+            if (oErr != 0) { 
                 return (Error.SNAPSHOT_ERROR, 0, 0);
             }
-            // markets是在ComptrollerStorage，mapping(address => Market) public markets 
-            /*
-                struct Market {
-                    bool isListed;                    
-                    uint collateralFactorMantissa;                
-                    mapping(address => bool) accountMembership;
-                    bool isComped;
-                }
-            */
+            
             //需要先設定該token的collateralFactor
-            vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});
-            
-            vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
-            
-            
-            //從oracle中取得該token的報價，並計算總抵押資產價值，與總借款加上此次贖回或是借款，是否有超過抵押資產的價值
-            
+            vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});            
+            vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});            
             vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
             
             if (vars.oraclePriceMantissa == 0) {
@@ -799,7 +783,6 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             }
         }
 
-        // These are safe, as the underflow condition is checked first
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             //如果總抵押大於借款，則返回0 => 代表沒有shortfall
             return (Error.NO_ERROR, vars.sumCollateral - vars.sumBorrowPlusEffects, 0);

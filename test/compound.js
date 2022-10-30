@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("CErc20", async () => {
+describe("Compound Testcase", async () => {
     let cerc20, tokenA, tokenB, cTokenA, cTokenB;
     let unitroller, Comptroller, comptroller, interestRateModel, oracle;
 
@@ -205,7 +205,7 @@ describe("CErc20", async () => {
 
         it("addr1 mint & approve token A", async () => {
             await tokenA.connect(addr1).mint(tokenAmount);
-            expect(await tokenA.balanceOf(addr1.address)).to.eq(tokenAmount);
+
             await tokenA.connect(addr1).approve(cTokenA.address, tokenAmount);
             expect(
                 await tokenA.allowance(addr1.address, cTokenA.address)
@@ -225,7 +225,6 @@ describe("CErc20", async () => {
                 (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
             //協助償還借貸資產，到借出的cToken合約，執行liquidateBorrow，第一個參數為被清算人，第二為協助清算資產數量，第三個為抵押資產的cToken地址
-            //liquidate
             await cTokenA
                 .connect(addr1)
                 .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
