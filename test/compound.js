@@ -134,6 +134,10 @@ describe("Compound Testcase", async () => {
             await cTokenA.redeem(supplyAmount);
             expect(await cTokenA.balanceOf(owner.address)).to.eq(0);
         });
+
+        it("Owner Erc20 balance should be token amount", async () => {
+            expect(await tokenA.balanceOf(owner.address)).to.eq(tokenAmount);
+        });
     });
 
     describe("Borrow & Repay", async () => {
