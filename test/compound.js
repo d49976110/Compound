@@ -52,7 +52,7 @@ describe("Compound Testcase", async () => {
         let Oracle = await ethers.getContractFactory("SimplePriceOracle");
         oracle = await Oracle.deploy();
 
-        // set proxy
+        // proxy setting (set unitroller & comptroller)
         let Unitroller = await ethers.getContractFactory("Unitroller");
         unitroller = await Unitroller.deploy();
 
@@ -60,12 +60,13 @@ describe("Compound Testcase", async () => {
         await unitroller._acceptImplementation();
 
         await comptroller._become(unitroller.address);
-        comptroller = await Comptroller.attach(unitroller.address);
+
+        comptroller = await Comptroller.attach(unitroller.address); // comptroller is a proxy => using unitroller address but use comptroller abi
 
         // create cTokenA & cTokenB
-        let CERC20 = await ethers.getContractFactory("CErc20Delegate");
-        let cerc20 = await CERC20.deploy();
-        let delegator = await ethers.getContractFactory("CErc20Delegator");
+        let CERC20 = await ethers.getContractFactory("CErc20Delegate"); // logic implementation
+        cerc20 = await CERC20.deploy();
+        let delegator = await ethers.getContractFactory("CErc20Delegator"); // proxy contract
         cTokenA = await delegator.deploy(
             tokenA.address,
             comptroller.address,

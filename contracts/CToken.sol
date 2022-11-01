@@ -605,6 +605,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      * @param repayAmount the amount of underlying tokens being returned, or -1 for the full outstanding amount
      * @return (uint) the actual repayment amount.
      */
+    // 用ERC20 換回 cToken
     function repayBorrowFresh(address payer, address borrower, uint repayAmount) internal returns (uint) {
         /* Fail if repayBorrow not allowed */
         uint allowed = comptroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount);
@@ -634,6 +635,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          *  doTransferIn reverts if anything goes wrong, since we can't be sure if side effects occurred.
          *   it returns the amount actually transferred, in case of a fee.
          */
+        // payer轉token給cToken合約
         uint actualRepayAmount = doTransferIn(payer, repayAmountFinal);
 
         /*
@@ -716,7 +718,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         }
 
         /* Fail if repayBorrow fails */
-        // transferIn
+        // 代替償還 ERC20，並取得cToken
         uint actualRepayAmount = repayBorrowFresh(liquidator, borrower, repayAmount);
         
         /////////////////////////
@@ -724,10 +726,12 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         // (No safe failures beyond this point)
 
         /* We calculate the number of collateral tokens that will be seized */
+        // 計算清算完後可以獲得指定collateral的cToken
         (uint amountSeizeError, uint seizeTokens) = comptroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
 
         require(amountSeizeError == NO_ERROR, "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED");
-
+        
+        //只能清算借款者有抵押的資產，且對方抵押的資產需要大於被清算量
         /* Revert if borrower collateral token balance < seizeTokens */
         require(cTokenCollateral.balanceOf(borrower) >= seizeTokens, "LIQUIDATE_SEIZE_TOO_MUCH");
 
@@ -766,6 +770,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      * @param borrower The account having collateral seized
      * @param seizeTokens The number of cTokens to seize
      */
+    //轉移抵押品的ctoken給清算者
     function seizeInternal(address seizerToken, address liquidator, address borrower, uint seizeTokens) internal {
         /* Fail if seize not allowed */
         uint allowed = comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens);
@@ -783,6 +788,8 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          *  borrowerTokensNew = accountTokens[borrower] - seizeTokens
          *  liquidatorTokensNew = accountTokens[liquidator] + seizeTokens
          */
+        
+        //protocolSeizeShareMantissa：協議會收取2.8%手續費
         uint protocolSeizeTokens = mul_(seizeTokens, Exp({mantissa: protocolSeizeShareMantissa}));
         uint liquidatorSeizeTokens = seizeTokens - protocolSeizeTokens;
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});

@@ -98,7 +98,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      * @param account The address of the account to pull assets for
      * @return A dynamic list with the assets the account has entered
      */
-    //這邊指的accountAsset是Ctoken
+    //用戶有哪些cToken進入到市場內
     function getAssetsIn(address account) external view returns (CToken[] memory) {
         CToken[] memory assetsIn = accountAssets[account];
 
@@ -505,6 +505,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
             }
             
             /* The liquidator may not repay more than what is allowed by the closeFactor */
+            //計算最大清算金額
             uint maxClose = mul_ScalarTruncate(Exp({mantissa: closeFactorMantissa}), borrowBalance);
             
             if (repayAmount > maxClose) {
@@ -551,6 +552,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      * @param borrower The address of the borrower
      * @param seizeTokens The number of collateral tokens to seize
      */
+    // 確認該資產是否能佔據，若可以則返回0
     function seizeAllowed(
         address cTokenCollateral,
         address cTokenBorrowed,
@@ -679,7 +681,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
                 account liquidity in excess of collateral requirements,
      *          account shortfall below collateral requirements)
      */
-    //用戶可抵押的資產，返回的為總資產價格
+    //[試算]用戶當前流動性，返回的為總資產價格
     function getAccountLiquidity(address account) public view returns (uint, uint, uint) {
         (Error err, uint liquidity, uint shortfall) = getHypotheticalAccountLiquidityInternal(account, CToken(address(0)), 0, 0);
         return (uint(err), liquidity, shortfall);
@@ -799,6 +801,7 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
      * @param actualRepayAmount The amount of cTokenBorrowed underlying to convert into cTokenCollateral tokens
      * @return (errorCode, number of cTokenCollateral tokens to be seized in a liquidation)
      */
+    // [試算]清算完後可以獲得指定collateral的cToken
     function liquidateCalculateSeizeTokens(address cTokenBorrowed, address cTokenCollateral, uint actualRepayAmount) override external view returns (uint, uint) {
         /* Read oracle prices for borrowed and collateral markets */
         
@@ -815,6 +818,9 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
          *  seizeTokens = seizeAmount / exchangeRate
          *   = actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
          */
+        // 先計算出總價值 ＝ actualRepayAmount * liquidationIncentive * priceBorrowed，再除上priceCollateral = 得到的token
+        // token / exchangeRate = cToken
+        //兩個合併 => actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
         uint exchangeRateMantissa = CToken(cTokenCollateral).exchangeRateStored(); // Note: reverts on error
         uint seizeTokens;
         Exp memory numerator;
