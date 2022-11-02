@@ -2,6 +2,7 @@
 pragma solidity ^0.8.10;
 
 import "./GovernorBravoInterfaces.sol";
+import "hardhat/console.sol";
 
 contract GovernorBravoDelegate is
     GovernorBravoDelegateStorageV2,
@@ -17,10 +18,10 @@ contract GovernorBravoDelegate is
     uint256 public constant MAX_PROPOSAL_THRESHOLD = 100000e18; //100,000 Comp
 
     /// @notice The minimum setable voting period
-    uint256 public constant MIN_VOTING_PERIOD = 5760; // About 24 hours
+    uint256 public constant MIN_VOTING_PERIOD = 5760; // About 24 hours blocks
 
     /// @notice The max setable voting period
-    uint256 public constant MAX_VOTING_PERIOD = 80640; // About 2 weeks
+    uint256 public constant MAX_VOTING_PERIOD = 80640; // About 2 weeks blocks
 
     /// @notice The min setable voting delay
     uint256 public constant MIN_VOTING_DELAY = 1;
@@ -48,7 +49,7 @@ contract GovernorBravoDelegate is
      * @notice Used to initialize the contract during delegator constructor
      * @param timelock_ The address of the Timelock
      * @param comp_ The address of the COMP token
-     * @param votingPeriod_ The initial voting period
+     * @param votingPeriod_ The initial voting period blocks,5760 = 1 day blocks
      * @param votingDelay_ The initial voting delay
      * @param proposalThreshold_ The initial proposal threshold
      */
@@ -478,7 +479,6 @@ contract GovernorBravoDelegate is
             "GovernorBravo::castVoteInternal: voter already voted"
         );
         uint96 votes = comp.getPriorVotes(voter, proposal.startBlock);
-
         if (support == 0) {
             proposal.againstVotes = add256(proposal.againstVotes, votes);
         } else if (support == 1) {

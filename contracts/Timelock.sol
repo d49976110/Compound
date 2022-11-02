@@ -2,6 +2,7 @@
 pragma solidity ^0.8.10;
 
 import "./SafeMath.sol";
+import "hardhat/console.sol";
 
 contract Timelock {
     using SafeMath for uint;
@@ -44,6 +45,7 @@ contract Timelock {
     }
 
     function acceptAdmin() public {
+        
         require(msg.sender == pendingAdmin, "Timelock::acceptAdmin: Call must come from pendingAdmin.");
         admin = msg.sender;
         pendingAdmin = address(0);
@@ -95,7 +97,6 @@ contract Timelock {
         } else {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
-
         // solium-disable-next-line security/no-call-value
         (bool success, bytes memory returnData) = target.call{value: value}(callData);
         require(success, "Timelock::executeTransaction: Transaction execution reverted.");

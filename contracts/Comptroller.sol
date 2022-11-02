@@ -870,7 +870,6 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
     function _setCloseFactor(uint newCloseFactorMantissa) external returns (uint) {
         // Check caller is admin
     	require(msg.sender == admin, "only admin can set close factor");
-
         uint oldCloseFactorMantissa = closeFactorMantissa;
         closeFactorMantissa = newCloseFactorMantissa;
         emit NewCloseFactor(oldCloseFactorMantissa, closeFactorMantissa);
