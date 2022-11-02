@@ -3,38 +3,24 @@ const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("Compound Testcase", async () => {
-    let cerc20, tokenA, tokenB, cTokenA, cTokenB;
-    let unitroller, Comptroller, comptroller, interestRateModel, oracle;
+    let unitroller, Comptroller, comptroller;
     let timelock,
         governorBravoDelegate,
         comp,
         governorBravoDelegator,
         governorAlpha;
+    let proposeId;
 
     //liquidate factor
     let closeFactor = BigInt(0.5 * 1e18);
-    let liquidationIncentive = BigInt(1.08 * 1e18);
+    let newCloseFactor = BigInt(0.2 * 1e18);
 
     before(async () => {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-        // create tokenA
-        let Erc20 = await ethers.getContractFactory("ERC20_custom");
-        tokenA = await Erc20.deploy("TokenA", "TOA");
-
-        // create interest model
-        // let InterestRateModel = await ethers.getContractFactory(
-        //     "WhitePaperInterestRateModel"
-        // );
-        // interestRateModel = await InterestRateModel.deploy(0, 0);
-
         //create comptroller
         Comptroller = await ethers.getContractFactory("Comptroller");
         comptroller = await Comptroller.deploy();
-
-        //create oracel
-        let Oracle = await ethers.getContractFactory("SimplePriceOracle");
-        oracle = await Oracle.deploy();
 
         // proxy setting (set unitroller & comptroller)
         let Unitroller = await ethers.getContractFactory("Unitroller");
@@ -46,31 +32,12 @@ describe("Compound Testcase", async () => {
         await comptroller._become(unitroller.address);
 
         comptroller = await Comptroller.attach(unitroller.address); // comptroller is a proxy => using unitroller address but use comptroller abi
-
-        // create cTokenA & cTokenB
-        // let CERC20 = await ethers.getContractFactory("CErc20Delegate"); // logic implementation
-        // cerc20 = await CERC20.deploy();
-        // let delegator = await ethers.getContractFactory("CErc20Delegator"); // proxy contract
-        // cTokenA = await delegator.deploy(
-        //     tokenA.address,
-        //     comptroller.address,
-        //     interestRateModel.address,
-        //     changeRateA,
-        //     nameA,
-        //     symbolA,
-        //     decimals,
-        //     owner.address,
-        //     cerc20.address,
-        //     "0x"
-        // );
     });
 
     describe("Settings", async () => {
-        it("admin set oracle & comptroller", async () => {
+        it(" set close factor", async () => {
             // set close factor
             await comptroller._setCloseFactor(closeFactor);
-            // set liquidation incentive
-            await comptroller._setLiquidationIncentive(liquidationIncentive);
         });
 
         it("deploy contracts", async () => {
@@ -179,12 +146,14 @@ describe("Compound Testcase", async () => {
                 governorBravoDelegator.address
             );
         });
-
-        it("set unitroller close factor", async () => {
+    });
+    describe("Use governorBravo to set comptroller close factor", async () => {
+        it("delegate comp vote", async () => {
             // comp delegate before cast vote
             await comp.delegate(owner.address);
+        });
 
-            // set bravo white list
+        it("set owner to white list", async () => {
             let time = (await helpers.time.latest()) + 86400;
             await governorBravoDelegator._setWhitelistAccountExpiration(
                 owner.address,
@@ -193,11 +162,13 @@ describe("Compound Testcase", async () => {
             expect(
                 await governorBravoDelegator.isWhitelisted(owner.address)
             ).to.eq(true);
+        });
 
+        it("propose", async () => {
             //propose
             let data = ethers.utils.defaultAbiCoder.encode(
                 ["uint256"],
-                [BigInt(0.2 * 1e18)]
+                [newCloseFactor]
             );
 
             await governorBravoDelegator.propose(
@@ -207,8 +178,9 @@ describe("Compound Testcase", async () => {
                 [data],
                 "change close factor"
             );
-
-            let proposeId = await governorBravoDelegator.proposalCount();
+        });
+        it("cast vote", async () => {
+            proposeId = await governorBravoDelegator.proposalCount();
 
             // add block
             let latestBlock = await helpers.time.latestBlock();
@@ -216,18 +188,25 @@ describe("Compound Testcase", async () => {
 
             //cast vote
             await governorBravoDelegator.castVote(proposeId, 1);
+        });
 
+        it("queue", async () => {
             // increase to proposal endtime
             latestBlock = await helpers.time.latestBlock();
             await helpers.mineUpTo(latestBlock + 5761);
 
             // queue
             await governorBravoDelegator.queue(proposeId);
-
+        });
+        it("execute", async () => {
             // add more 3 days,because timelock delay is 3 days
             await helpers.time.increase(300000);
             // execute
             await governorBravoDelegator.execute(proposeId);
+
+            expect(await comptroller.closeFactorMantissa()).to.eq(
+                newCloseFactor
+            );
         });
     });
 });
