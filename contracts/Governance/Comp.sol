@@ -147,6 +147,7 @@ contract Comp {
      * @notice Delegate votes from `msg.sender` to `delegatee`
      * @param delegatee The address to delegate votes to
      */
+    // 一次就會將所有投票權利給對方
     function delegate(address delegatee) public {
         return _delegate(msg.sender, delegatee);
     }

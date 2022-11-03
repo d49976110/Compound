@@ -818,21 +818,21 @@ contract Comptroller is ComptrollerV7Storage, ComptrollerInterface, ComptrollerE
          *  seizeTokens = seizeAmount / exchangeRate
          *   = actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
          */
-        // 先計算出總價值 ＝ actualRepayAmount * liquidationIncentive * priceBorrowed，再除上priceCollateral = 得到的token
+        // 先計算出可得到返回的抵押Token數量 ＝ actualRepayAmount * liquidationIncentive * priceBorrowed，再除上priceCollateral
         // token / exchangeRate = cToken
-        //兩個合併 => actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
+        // 兩個合併 => actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
         uint exchangeRateMantissa = CToken(cTokenCollateral).exchangeRateStored(); // Note: reverts on error
         uint seizeTokens;
         Exp memory numerator;
         Exp memory denominator;
         Exp memory ratio;
-
+        // 27.72 * 1.1 * 1 / 70  = 0.314 (tokenA amount)  
         numerator = mul_(Exp({mantissa: liquidationIncentiveMantissa}), Exp({mantissa: priceBorrowedMantissa}));
         denominator = mul_(Exp({mantissa: priceCollateralMantissa}), Exp({mantissa: exchangeRateMantissa}));
         
         ratio = div_(numerator, denominator);
+        // seizeTokens：返回的ctoken數量
         seizeTokens = mul_ScalarTruncate(ratio, actualRepayAmount);
-
         return (uint(Error.NO_ERROR), seizeTokens);
     }
 

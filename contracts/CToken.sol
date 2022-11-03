@@ -728,7 +728,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         /* We calculate the number of collateral tokens that will be seized */
         // 計算清算完後可以獲得指定collateral的cToken
         (uint amountSeizeError, uint seizeTokens) = comptroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
-
+        console.log("seizeTokens",seizeTokens);
         require(amountSeizeError == NO_ERROR, "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED");
         
         //只能清算借款者有抵押的資產，且對方抵押的資產需要大於被清算量
@@ -777,7 +777,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         if (allowed != 0) {
             revert LiquidateSeizeComptrollerRejection(allowed);
         }
-
+        
         /* Fail if borrower = liquidator */
         if (borrower == liquidator) {
             revert LiquidateSeizeLiquidatorIsBorrower();
@@ -791,6 +791,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         
         //protocolSeizeShareMantissa：協議會收取2.8%手續費
         uint protocolSeizeTokens = mul_(seizeTokens, Exp({mantissa: protocolSeizeShareMantissa}));
+        // liquidatorSeizeTokens = seiziTokens * 0.972
         uint liquidatorSeizeTokens = seizeTokens - protocolSeizeTokens;
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
         uint protocolSeizeAmount = mul_ScalarTruncate(exchangeRate, protocolSeizeTokens);
@@ -800,7 +801,14 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         /////////////////////////
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
-
+        console.log("totalReserves",totalReserves);
+        console.log("totalReservesNew",totalReservesNew);
+        console.log("seizeTokens internal",seizeTokens);
+        console.log("protocolSeizeTokens",protocolSeizeTokens);
+        console.log("protocolSeizeAmount",protocolSeizeAmount);
+        console.log("liquidatorSeizeTokens",liquidatorSeizeTokens);
+        
+        
         /* We write the calculated values into storage */
         totalReserves = totalReservesNew;
         totalSupply = totalSupply - protocolSeizeTokens;
