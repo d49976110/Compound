@@ -1,22 +1,24 @@
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
 
+let Token, hardhatToken, owner, addr1, addr2;
+
+async function deployTokenFixture() {
+    Token = await ethers.getContractFactory("ERC20_custom");
+    [owner, addr1, addr2] = await ethers.getSigners();
+
+    hardhatToken = await Token.deploy("123", "123");
+
+    await hardhatToken.deployed();
+
+    // mint
+    await hardhatToken.mint(BigInt(1000n * 10n ** 18n));
+
+    // Fixtures can return anything you consider useful for your tests
+    return { Token, hardhatToken, owner, addr1, addr2 };
+}
+
 describe("Token contract", function () {
-    async function deployTokenFixture() {
-        const Token = await ethers.getContractFactory("ERC20_custom");
-        const [owner, addr1, addr2] = await ethers.getSigners();
-
-        const hardhatToken = await Token.deploy("123", "123");
-
-        await hardhatToken.deployed();
-
-        // mint
-        await hardhatToken.mint(BigInt(1000n * 10n ** 18n));
-
-        // Fixtures can return anything you consider useful for your tests
-        return { Token, hardhatToken, owner, addr1, addr2 };
-    }
-
     it("Should assign the total supply of tokens to the owner", async function () {
         const { hardhatToken, owner, addr1 } = await loadFixture(
             deployTokenFixture
