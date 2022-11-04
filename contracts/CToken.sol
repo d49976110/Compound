@@ -422,10 +422,10 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         }
         //取得當下的changeRate，透過exchangeRateStoredInternal即時計算
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
-
+        
         //返回真的傳入合約的數量
         uint actualMintAmount = doTransferIn(minter, mintAmount);
-    
+        
         //計算CErc20的數量，因為exchangeRate是放大1e18，所以actualMintAmount需要同步乘上1e18
         uint mintTokens = div_(actualMintAmount, exchangeRate);
         
@@ -518,6 +518,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
       */
     function borrowInternal(uint borrowAmount) internal nonReentrant {
         accrueInterest();
+        
         // borrowFresh emits borrow-specific logs on errors, so we don't need to
         borrowFresh(payable(msg.sender), borrowAmount);
     }
@@ -551,6 +552,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
          */
         uint accountBorrowsPrev = borrowBalanceStoredInternal(borrower);
         uint accountBorrowsNew = accountBorrowsPrev + borrowAmount;
+
         uint totalBorrowsNew = totalBorrows + borrowAmount;
 
         /////////////////////////

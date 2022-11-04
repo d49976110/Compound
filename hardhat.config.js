@@ -7,7 +7,7 @@ module.exports = {
         hardhat: {
             forking: {
                 url: process.env.JSON_RPC_URL,
-                blockNumber: 15823148,
+                blockNumber: 15815693,
             },
             allowUnlimitedContractSize: true,
         },

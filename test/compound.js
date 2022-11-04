@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 let cerc20, tokenA, tokenB, cTokenA, cTokenB;
 let unitroller, Comptroller, comptroller, interestRateModel, oracle;
