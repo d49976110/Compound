@@ -196,6 +196,7 @@ describe("Compound liquidate with change collateral factor", async () => {
                 await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
             ).to.eq(borrowAmount_A_from_B);
         });
+
         it("change collateranl factor", async () => {
             await comptroller._setCollateralFactor(
                 cTokenB.address,
