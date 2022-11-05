@@ -11,5 +11,10 @@ run
 
 ```
 npm install
+
+// homework 1 ~ 5
 npx hardhat test test/compound.js
+
+// GovernorBravo
+npx hardhat test test/GovernorBravo.js
 ```

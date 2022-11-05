@@ -5,19 +5,28 @@ const {
     impersonateAccount,
 } = require("@nomicfoundation/hardhat-network-helpers");
 
-let flashloan, binance, usdc, owner, addr1, addr2;
+let flashloan, singlwswap, binance, usdc, uni;
+let owner, addr1, addr2;
 
 const ADDRESS_PROVIDER = "0xB53C1a33016B2DC2fF3653530bfF1848a515c8c5";
+const UNISWAP_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const binanceAddress = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
-const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // token A
+const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const uniAddress = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984";
+
+let USDCAmount = 50n * 10n ** 6n;
 
 async function deployContracts() {
     [owner, addr1, addr2] = await ethers.getSigners();
 
     usdc = await ethers.getContractAt("ERC20", usdcAddress);
+    uni = await ethers.getContractAt("ERC20", uniAddress);
 
     let Flashloan = await ethers.getContractFactory("TestAaveFlashLoan");
     flashloan = await Flashloan.deploy(ADDRESS_PROVIDER);
+
+    let SingleSwap = await ethers.getContractFactory("TestSingleSwap");
+    singlwswap = await SingleSwap.deploy(UNISWAP_ROUTER);
 }
 
 describe("Token contract", function () {
@@ -35,11 +44,40 @@ describe("Token contract", function () {
         binance = await ethers.getSigner(binanceAddress);
 
         expect(
-            await usdc.connect(binance).transfer(owner.address, 50n * 10n ** 6n)
+            await usdc.connect(binance).transfer(flashloan.address, USDCAmount)
+        ).to.changeTokenBalances(
+            binance,
+            [binance, flashloan],
+            [-USDCAmount, USDCAmount]
+        );
+    });
+
+    it("Execute flashloan", async () => {
+        console.log("pre balance", await usdc.balanceOf(flashloan.address));
+
+        await flashloan.testFlashLoan(usdcAddress, USDCAmount - 1n);
+        console.log("balance", await usdc.balanceOf(flashloan.address));
+    });
+
+    it("Swap USDC to UNI", async () => {
+        // give some usdc to owner
+        expect(
+            await usdc.connect(binance).transfer(owner.address, USDCAmount)
         ).to.changeTokenBalances(
             binance,
             [binance, owner],
-            [-(50n * 10n ** 6n), 50n * 10n ** 6n]
+            [-USDCAmount, USDCAmount]
         );
+
+        console.log("pre usdc balance", await usdc.balanceOf(owner.address));
+        console.log("pre uni balance", await uni.balanceOf(owner.address));
+
+        //approve usdc for singleswap contract
+        await usdc.approve(singlwswap.address, USDCAmount);
+
+        await singlwswap.swapExactInputSingle(USDCAmount);
+
+        console.log("after usdc balance", await usdc.balanceOf(owner.address));
+        console.log("after uni balance", await uni.balanceOf(owner.address));
     });
 });

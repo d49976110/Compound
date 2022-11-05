@@ -217,11 +217,13 @@ describe("Compound liquidate with change collateral factor", async () => {
                 await tokenA.allowance(addr1.address, cTokenA.address)
             ).to.eq(tokenAmount);
         });
+
         it("liquidity should = 0 && short fall should > 0", async () => {
             let result = await comptroller.getAccountLiquidity(owner.address);
             expect(result[1]).to.eq(0);
             expect(result[2]).to.gt(0);
         });
+
         it("liquidate", async () => {
             let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
                 owner.address

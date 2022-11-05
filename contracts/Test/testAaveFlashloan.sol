@@ -3,6 +3,7 @@ pragma solidity ^0.8.10;
 
 // import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../interfaces/AAVE/FlashLoanReceiverBase.sol";
+import "hardhat/console.sol";
 
 contract TestAaveFlashLoan is FlashLoanReceiverBase {
   using SafeMath for uint;
@@ -59,7 +60,12 @@ contract TestAaveFlashLoan is FlashLoanReceiverBase {
       emit Log("borrowed", amounts[i]);
       emit Log("fee", premiums[i]);
 
+      //歸還數量需要加上手續費，AAVE手續費為萬分之9
       uint amountOwing = amounts[i].add(premiums[i]);
+      console.log("amountOwing",amountOwing);
+
+
+      
       IERC20(assets[i]).approve(address(LENDING_POOL), amountOwing);
     }
     // repay Aave
