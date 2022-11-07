@@ -2,6 +2,7 @@
 pragma solidity >=0.6.0;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import "hardhat/console.sol";
 
 library TransferHelper {
     /// @notice Transfers tokens from the targeted address to the given destination
@@ -18,6 +19,8 @@ library TransferHelper {
     ) internal {
         (bool success, bytes memory data) =
             token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
+        console.log("success",success);
+        console.log("data.length",data.length);
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'STF');
     }
 

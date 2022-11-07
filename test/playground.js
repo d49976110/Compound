@@ -22,11 +22,11 @@ async function deployContracts() {
     usdc = await ethers.getContractAt("ERC20", usdcAddress);
     uni = await ethers.getContractAt("ERC20", uniAddress);
 
-    let Flashloan = await ethers.getContractFactory("TestAaveFlashLoan");
-    flashloan = await Flashloan.deploy(ADDRESS_PROVIDER);
-
     let SingleSwap = await ethers.getContractFactory("TestSingleSwap");
     singlwswap = await SingleSwap.deploy(UNISWAP_ROUTER);
+
+    let Flashloan = await ethers.getContractFactory("TestAaveFlashLoan");
+    flashloan = await Flashloan.deploy(ADDRESS_PROVIDER, singlwswap.address);
 }
 
 describe("Token contract", function () {
@@ -51,33 +51,40 @@ describe("Token contract", function () {
             [-USDCAmount, USDCAmount]
         );
     });
-
+    //            swap                                   swap
+    //flow = USDC  ->  UNI  -> liquidate -> cUni ->  UNI  -> USDC
     it("Execute flashloan", async () => {
-        console.log("pre balance", await usdc.balanceOf(flashloan.address));
-
-        await flashloan.testFlashLoan(usdcAddress, USDCAmount - 1n);
-        console.log("balance", await usdc.balanceOf(flashloan.address));
-    });
-
-    it("Swap USDC to UNI", async () => {
-        // give some usdc to owner
-        expect(
-            await usdc.connect(binance).transfer(owner.address, USDCAmount)
-        ).to.changeTokenBalances(
-            binance,
-            [binance, owner],
-            [-USDCAmount, USDCAmount]
+        console.log(
+            "pre USDC balance (flashloan)",
+            await usdc.balanceOf(flashloan.address)
         );
 
-        console.log("pre usdc balance", await usdc.balanceOf(owner.address));
-        console.log("pre uni balance", await uni.balanceOf(owner.address));
-
-        //approve usdc for singleswap contract
-        await usdc.approve(singlwswap.address, USDCAmount);
-
-        await singlwswap.swapExactInputSingle(USDCAmount);
-
-        console.log("after usdc balance", await usdc.balanceOf(owner.address));
-        console.log("after uni balance", await uni.balanceOf(owner.address));
+        await flashloan.testFlashLoan(usdcAddress, USDCAmount - 1n);
+        console.log(
+            "USDC balance (flashloan)",
+            await usdc.balanceOf(flashloan.address)
+        );
     });
+
+    // it("Swap USDC to UNI", async () => {
+    //     // give some usdc to owner
+    //     expect(
+    //         await usdc.connect(binance).transfer(owner.address, USDCAmount)
+    //     ).to.changeTokenBalances(
+    //         binance,
+    //         [binance, owner],
+    //         [-USDCAmount, USDCAmount]
+    //     );
+
+    //     console.log("pre usdc balance", await usdc.balanceOf(owner.address));
+    //     console.log("pre uni balance", await uni.balanceOf(owner.address));
+
+    //     //approve usdc for singleswap contract
+    //     await usdc.approve(singlwswap.address, USDCAmount);
+
+    //     await singlwswap.swapExactInputSingle(USDCAmount);
+
+    //     console.log("after usdc balance", await usdc.balanceOf(owner.address));
+    //     console.log("after uni balance", await uni.balanceOf(owner.address));
+    // });
 });
