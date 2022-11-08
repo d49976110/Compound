@@ -4,16 +4,19 @@ const {
     impersonateAccount,
 } = require("@nomicfoundation/hardhat-network-helpers");
 
-let usdc, uni, cerc20, tokenA, tokenB, cTokenA, cTokenB;
+let usdc, uni, cerc20, binance, cTokenA, cTokenB;
 let unitroller, Comptroller, comptroller, interestRateModel, oracle;
+let flashloan, repayAmount;
 
 // token info
 let USDCAmount = BigInt(5000 * 1e6); // tokenA
 let UNIAmount = BigInt(1000 * 1e18); // tokenB
 
-let binanceAddress = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
-let usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // token A
-let uniAddress = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"; // token B
+const binanceAddress = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
+const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // token A
+const uniAddress = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"; // token B
+const ADDRESS_PROVIDER = "0xB53C1a33016B2DC2fF3653530bfF1848a515c8c5";
+const UNISWAP_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 
 // let decimals = 6;
 let decimals = 18;
@@ -39,10 +42,9 @@ let liquidationIncentive = BigInt(1.08 * 1e18);
 async function deployContracts() {
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-    // create tokenA & tokenB
-    // let Erc20 = await ethers.getContractFactory("ERC20_custom");
-    // tokenA = await Erc20.deploy("TokenA", "TOA");
-    // tokenB = await Erc20.deploy("TokenB", "TOB");
+    // get USDC & UNI contract instance
+    usdc = await ethers.getContractAt("ERC20", usdcAddress);
+    uni = await ethers.getContractAt("ERC20", uniAddress);
 
     // create interest model
     let InterestRateModel = await ethers.getContractFactory(
@@ -125,20 +127,18 @@ describe("Flashloan", async () => {
     });
     describe("Owner get UNI & address1 gets USDC from Binance wallet", async () => {
         it("binance wallet should have UNI more than 1000 ", async () => {
-            uni = await ethers.getContractAt("ERC20", uniAddress);
             let balance = await uni.balanceOf(binanceAddress);
 
             expect(balance).to.gt(UNIAmount);
         });
         it("transfer 1000 UNI to owner", async () => {
             await impersonateAccount(binanceAddress);
-            const binance = await ethers.getSigner(binanceAddress);
+            binance = await ethers.getSigner(binanceAddress);
             uni.connect(binance).transfer(owner.address, UNIAmount);
 
             expect(await uni.balanceOf(owner.address)).to.eq(UNIAmount);
         });
         it("binance wallet should have USDC more than 5000 ", async () => {
-            usdc = await ethers.getContractAt("ERC20", usdcAddress);
             let balance = await usdc.balanceOf(binanceAddress);
 
             expect(balance).to.gt(USDCAmount);
@@ -182,7 +182,7 @@ describe("Flashloan", async () => {
             expect(await usdc.balanceOf(owner.address)).to.eq(USDCAmount);
         });
     });
-    describe("Liquidate_change oracle price", async () => {
+    describe("Using AAVE flashloan to liquidate => change oracle price", async () => {
         it("change UNI(tokenB) price", async () => {
             await oracle.setUnderlyingPrice(cTokenB.address, newTokenBPrice);
         });
@@ -192,6 +192,56 @@ describe("Flashloan", async () => {
 
             expect(result[1]).to.eq(0);
             expect(result[2]).to.gt(0);
+        });
+
+        //     liquidate      redeem       swap
+        // USDC   ->    cUni    ->    UNI   ->  USDC
+        it("create flashloan contract", async () => {
+            let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
+                owner.address
+            );
+
+            repayAmount = (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
+            // create contract
+            // flashloan contract
+            let Flashloan = await ethers.getContractFactory(
+                "TestAaveFlashLoan"
+            );
+            flashloan = await Flashloan.deploy(
+                ADDRESS_PROVIDER,
+                UNISWAP_ROUTER,
+                cTokenA.address,
+                cTokenB.address,
+                owner.address,
+                repayAmount
+            );
+            // console.log(
+            //     "pre USDC balance",
+            //     await usdc.balanceOf(flashloan.address)
+            // );
+            // expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
+
+            // // execute => addr1 to liquidate owner
+            // await flashloan
+            //     .connect(addr1)
+            //     .testFlashLoan(usdcAddress, repayAmount);
+
+            // console.log(
+            //     "USDC balance",
+            //     await usdc.balanceOf(flashloan.address)
+            // );
+            // expect(await usdc.balanceOf(flashloan.address)).to.gt(0);
+        });
+
+        it("execute flashloan", async () => {
+            expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
+
+            // execute => addr1 to liquidate owner
+            await flashloan
+                .connect(addr1)
+                .testFlashLoan(usdcAddress, repayAmount);
+
+            expect(await usdc.balanceOf(flashloan.address)).to.gt(0);
         });
 
         // it("addr1 liquidate owner", async () => {

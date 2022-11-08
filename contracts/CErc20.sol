@@ -115,6 +115,7 @@ contract CErc20 is CToken, CErc20Interface {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function liquidateBorrow(address borrower, uint repayAmount, CTokenInterface cTokenCollateral) override external returns (uint) {
+        
         liquidateBorrowInternal(borrower, repayAmount, cTokenCollateral);
         return NO_ERROR;
     }

@@ -11,7 +11,10 @@ contract TestAaveFlashLoan is FlashLoanReceiverBase {
   using SafeMath for uint;
 
   ISwapRouter public immutable swapRouter;
-  CErc20 public immutable cErc20;
+  CErc20 public immutable cUSDC;
+  CErc20 public immutable cUNI;
+  address public borrower;
+  uint public repayAmount;
   // Uniswap
   address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
   address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -19,18 +22,23 @@ contract TestAaveFlashLoan is FlashLoanReceiverBase {
 
   event Log(string message, uint val);
 
-  constructor(ILendingPoolAddressesProvider _addressProvider,ISwapRouter _swapRouter,CErc20 _CtokenAddress)
+  constructor(ILendingPoolAddressesProvider _addressProvider,ISwapRouter _swapRouter,CErc20 _cUSDC,CErc20 _cUNI,address _borrower,uint _repayAmount)
     FlashLoanReceiverBase(_addressProvider)
   {
     swapRouter = ISwapRouter(_swapRouter);
-    cErc20 = CErc20(_CtokenAddress);
+    cUSDC = CErc20(_cUSDC);
+    cUNI = CErc20(_cUNI);
+    borrower = _borrower;
+    repayAmount = _repayAmount;
+
   }
   
   ///@param asset ERC20 token address
   ///@param amount loan amount
   function testFlashLoan(address asset, uint amount) external {
-    uint bal = IERC20(asset).balanceOf(address(this));
-    require(bal > amount, "bal <= amount");
+    // uint bal = IERC20(asset).balanceOf(address(this));
+    // require(bal > amount, "bal <= amount");
+    
     address receiver = address(this);
 
     address[] memory assets = new address[](1);
@@ -67,41 +75,36 @@ contract TestAaveFlashLoan is FlashLoanReceiverBase {
     address initiator,
     bytes calldata params
   ) external override returns (bool) {
-      // approve this address for uniswap using USDC
-      IERC20(assets[0]).approve(address(swapRouter),amounts[0]);
       
-      // exchange from USDC to UNI
-      ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: USDC,
-                tokenOut: UNI,
-                fee: poolFee,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amounts[0],
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            });
-      uint amountOut_UNI = swapRouter.exactInputSingle(params);
-    
+      // approve cUSDC to use addr1 USDC
+      IERC20(USDC).approve(address(cUSDC),repayAmount);
+      
+      // use USDC to liquidate
+      cUSDC.liquidateBorrow(borrower,repayAmount,cUNI);
+      
+      // redeem from cUNI to UNI
+      cUNI.redeem(cUNI.balanceOf(address(this)));
+      
+      uint uniBalance = IERC20(UNI).balanceOf(address(this));
+      // swap from UNI to USDC
       // approve this address for uniswap using UNI
-      IERC20(UNI).approve(address(swapRouter),amountOut_UNI);
+      IERC20(UNI).approve(address(swapRouter),uniBalance);
       
       // exchange from UNI to USDC
-      ISwapRouter.ExactInputSingleParams memory params_UNI =
+      ISwapRouter.ExactInputSingleParams memory params =
             ISwapRouter.ExactInputSingleParams({
                 tokenIn: UNI,
                 tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: amountOut_UNI,
+                amountIn: uniBalance,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
             });
-  
-      uint amountOut_USDC = swapRouter.exactInputSingle(params_UNI);
-
+      
+      uint amountOut_USDC = swapRouter.exactInputSingle(params);
+      
     for (uint i = 0; i < assets.length; i++) {
       //歸還數量需要加上手續費，AAVE手續費為萬分之9
       uint amountOwing = amounts[i].add(premiums[i]);

@@ -669,7 +669,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
      */
     function liquidateBorrowInternal(address borrower, uint repayAmount, CTokenInterface cTokenCollateral) internal nonReentrant {
         accrueInterest();
-
+        
         uint error = cTokenCollateral.accrueInterest();
         if (error != NO_ERROR) {
             // accrueInterest emits logs on errors, but we still want to log the fact that an attempted liquidation failed
@@ -691,6 +691,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
     function liquidateBorrowFresh(address liquidator, address borrower, uint repayAmount, CTokenInterface cTokenCollateral) internal {
         /* Fail if liquidate not allowed */
         uint allowed = comptroller.liquidateBorrowAllowed(address(this), address(cTokenCollateral), liquidator, borrower, repayAmount);
+       
         if (allowed != 0) {
             revert LiquidateComptrollerRejection(allowed);
         }
@@ -731,7 +732,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         /* We calculate the number of collateral tokens that will be seized */
         // 計算清算完後可以獲得指定collateral的cToken
         (uint amountSeizeError, uint seizeTokens) = comptroller.liquidateCalculateSeizeTokens(address(this), address(cTokenCollateral), actualRepayAmount);
-
+        
         require(amountSeizeError == NO_ERROR, "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED");
         
         //只能清算借款者有抵押的資產，且對方抵押的資產需要大於被清算量
@@ -741,6 +742,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         // If this is also the collateral, run seizeInternal to avoid re-entrancy, otherwise make an external call
         if (address(cTokenCollateral) == address(this)) {
             seizeInternal(address(this), liquidator, borrower, seizeTokens);
+            console.log("seizeInternal");
         } else {
             require(cTokenCollateral.seize(liquidator, borrower, seizeTokens) == NO_ERROR, "token seizure failed");
         }
@@ -777,6 +779,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
     function seizeInternal(address seizerToken, address liquidator, address borrower, uint seizeTokens) internal {
         /* Fail if seize not allowed */
         uint allowed = comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens);
+    
         if (allowed != 0) {
             revert LiquidateSeizeComptrollerRejection(allowed);
         }
@@ -799,7 +802,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         Exp memory exchangeRate = Exp({mantissa: exchangeRateStoredInternal()});
         uint protocolSeizeAmount = mul_ScalarTruncate(exchangeRate, protocolSeizeTokens);
         uint totalReservesNew = totalReserves + protocolSeizeAmount;
-
+        
 
         /////////////////////////
         // EFFECTS & INTERACTIONS
@@ -817,7 +820,7 @@ abstract contract CToken is CTokenInterface, ExponentialNoError, TokenErrorRepor
         totalSupply = totalSupply - protocolSeizeTokens;
         accountTokens[borrower] = accountTokens[borrower] - seizeTokens;
         accountTokens[liquidator] = accountTokens[liquidator] + liquidatorSeizeTokens;
-
+        
         /* Emit a Transfer event */
         emit Transfer(borrower, liquidator, liquidatorSeizeTokens);
         emit Transfer(borrower, address(this), protocolSeizeTokens);
