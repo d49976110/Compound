@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("Compound Testcase", async () => {
+describe("Governor Bravo", async () => {
     let unitroller, Comptroller, comptroller;
     let timelock,
         governorBravoDelegate,

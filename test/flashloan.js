@@ -3,6 +3,9 @@ const { ethers } = require("hardhat");
 const {
     impersonateAccount,
 } = require("@nomicfoundation/hardhat-network-helpers");
+const { Logger, LogLevel } = require("@ethersproject/logger");
+
+Logger.setLogLevel(LogLevel.ERROR);
 
 let usdc, uni, cerc20, binance, cTokenA, cTokenB;
 let unitroller, Comptroller, comptroller, interestRateModel, oracle;
@@ -169,6 +172,7 @@ describe("Flashloan", async () => {
         it("owner approve 1000 uni(tokenB) for compound and supply ", async () => {
             await uni.approve(cTokenB.address, UNIAmount);
             await cTokenB.mint(UNIAmount);
+
             expect(await cTokenB.balanceOf(owner.address)).to.eq(UNIAmount);
         });
 
@@ -193,20 +197,20 @@ describe("Flashloan", async () => {
             expect(result[1]).to.eq(0);
             expect(result[2]).to.gt(0);
         });
-
-        //     liquidate      redeem       swap
-        // USDC   ->    cUni    ->    UNI   ->  USDC
+        /*
+        flow: 
+                flashloan     liquidate      redeem       swap
+            aave    ->    USDC   ->    cUni    ->    UNI   ->  USDC
+        */
         it("create flashloan contract", async () => {
             let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
                 owner.address
             );
 
             repayAmount = (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
-            // create contract
-            // flashloan contract
-            let Flashloan = await ethers.getContractFactory(
-                "TestAaveFlashLoan"
-            );
+
+            // create flashloan contract
+            let Flashloan = await ethers.getContractFactory("AaveFlashLoan");
             flashloan = await Flashloan.deploy(
                 ADDRESS_PROVIDER,
                 UNISWAP_ROUTER,
@@ -215,60 +219,19 @@ describe("Flashloan", async () => {
                 owner.address,
                 repayAmount
             );
-            // console.log(
-            //     "pre USDC balance",
-            //     await usdc.balanceOf(flashloan.address)
-            // );
-            // expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
-
-            // // execute => addr1 to liquidate owner
-            // await flashloan
-            //     .connect(addr1)
-            //     .testFlashLoan(usdcAddress, repayAmount);
-
-            // console.log(
-            //     "USDC balance",
-            //     await usdc.balanceOf(flashloan.address)
-            // );
-            // expect(await usdc.balanceOf(flashloan.address)).to.gt(0);
         });
 
         it("execute flashloan", async () => {
             expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
 
             // execute => addr1 to liquidate owner
-            await flashloan
-                .connect(addr1)
-                .testFlashLoan(usdcAddress, repayAmount);
+            await flashloan.connect(addr1).flashLoan(usdcAddress, repayAmount);
 
             expect(await usdc.balanceOf(flashloan.address)).to.gt(0);
+            // console.log(
+            //     "USDC balance",
+            //     await usdc.balanceOf(flashloan.address)
+            // );
         });
-
-        // it("addr1 liquidate owner", async () => {
-        //     // check owner borrow token balance
-        //     let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
-        //         owner.address
-        //     );
-
-        //     let repayAmount =
-        //         (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
-
-        //     //協助償還借貸資產，到借出的cToken合約，執行liquidateBorrow，第一個參數為被清算人，第二為協助清算資產數量，第三個為返回的抵押資產的cToken地址
-        //     await cTokenA
-        //         .connect(addr1)
-        //         .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
-        // });
-        // it("addr1 liquidate owner again", async () => {
-        //     let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
-        //         owner.address
-        //     );
-
-        //     let repayAmount =
-        //         (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
-
-        //     await cTokenA
-        //         .connect(addr1)
-        //         .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
-        // });
     });
 });

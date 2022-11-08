@@ -4,6 +4,9 @@ const { ethers } = require("hardhat");
 const {
     impersonateAccount,
 } = require("@nomicfoundation/hardhat-network-helpers");
+const { Logger, LogLevel } = require("@ethersproject/logger");
+
+Logger.setLogLevel(LogLevel.ERROR);
 
 let flashloan, singlwswap, binance, usdc, uni;
 let owner, addr1, addr2;
@@ -32,7 +35,7 @@ async function deployContracts() {
     flashloan = await Flashloan.deploy(ADDRESS_PROVIDER, UNISWAP_ROUTER);
 }
 
-describe("Token contract", function () {
+describe("Playground", function () {
     before(async () => {
         await deployContracts();
     });
@@ -57,37 +60,37 @@ describe("Token contract", function () {
     //           liquidate      redeem       swap
     //flow = USDC   ->    cUni    ->    UNI   ->  USDC
     it("Execute flashloan", async () => {
-        console.log(
-            "pre USDC balance (flashloan)",
-            await usdc.balanceOf(flashloan.address)
-        );
+        // console.log(
+        //     "pre USDC balance (flashloan)",
+        //     await usdc.balanceOf(flashloan.address)
+        // );
 
         await flashloan.testFlashLoan(usdcAddress, USDCAmount - 1n);
-        console.log(
-            "USDC balance (flashloan)",
-            await usdc.balanceOf(flashloan.address)
-        );
+        // console.log(
+        //     "USDC balance (flashloan)",
+        //     await usdc.balanceOf(flashloan.address)
+        // );
     });
 
-    // it("Swap USDC to UNI", async () => {
-    //     // give some usdc to owner
-    //     expect(
-    //         await usdc.connect(binance).transfer(owner.address, USDCAmount)
-    //     ).to.changeTokenBalances(
-    //         binance,
-    //         [binance, owner],
-    //         [-USDCAmount, USDCAmount]
-    //     );
+    it("Swap USDC to UNI", async () => {
+        // give some usdc to owner
+        expect(
+            await usdc.connect(binance).transfer(owner.address, USDCAmount)
+        ).to.changeTokenBalances(
+            binance,
+            [binance, owner],
+            [-USDCAmount, USDCAmount]
+        );
 
-    //     console.log("pre usdc balance", await usdc.balanceOf(owner.address));
-    //     console.log("pre uni balance", await uni.balanceOf(owner.address));
+        // console.log("pre usdc balance", await usdc.balanceOf(owner.address));
+        // console.log("pre uni balance", await uni.balanceOf(owner.address));
 
-    //     //approve usdc for singleswap contract
-    //     await usdc.approve(singlwswap.address, USDCAmount);
+        //approve usdc for singleswap contract
+        await usdc.approve(singlwswap.address, USDCAmount);
 
-    //     await singlwswap.swapExactInputSingle(USDCAmount);
+        await singlwswap.swapExactInputSingle_USDC(USDCAmount);
 
-    //     console.log("after usdc balance", await usdc.balanceOf(owner.address));
-    //     console.log("after uni balance", await uni.balanceOf(owner.address));
-    // });
+        // console.log("after usdc balance", await usdc.balanceOf(owner.address));
+        // console.log("after uni balance", await uni.balanceOf(owner.address));
+    });
 });

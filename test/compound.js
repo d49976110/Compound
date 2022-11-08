@@ -1,5 +1,8 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { Logger, LogLevel } = require("@ethersproject/logger");
+
+Logger.setLogLevel(LogLevel.ERROR);
 
 let cerc20, tokenA, tokenB, cTokenA, cTokenB;
 let unitroller, Comptroller, comptroller, interestRateModel, oracle;
