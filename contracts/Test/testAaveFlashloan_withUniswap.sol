@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-
+// import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import '../interfaces/Uniswapv3/ISwapRouter.sol';
 import "../interfaces/AAVE/FlashLoanReceiverBase.sol";
-import "../CErc20.sol";
+// import "./testUniswapSingleSwap.sol";
 import "hardhat/console.sol";
 
-contract TestAaveFlashLoan is FlashLoanReceiverBase {
+contract TestAaveFlashLoan_withUniswap is FlashLoanReceiverBase {
   using SafeMath for uint;
 
   ISwapRouter public immutable swapRouter;
-  CErc20 public immutable cErc20;
+
   // Uniswap
   address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
   address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -19,11 +19,10 @@ contract TestAaveFlashLoan is FlashLoanReceiverBase {
 
   event Log(string message, uint val);
 
-  constructor(ILendingPoolAddressesProvider _addressProvider,ISwapRouter _swapRouter,CErc20 _CtokenAddress)
+  constructor(ILendingPoolAddressesProvider _addressProvider,ISwapRouter _swapRouter)
     FlashLoanReceiverBase(_addressProvider)
   {
     swapRouter = ISwapRouter(_swapRouter);
-    cErc20 = CErc20(_CtokenAddress);
   }
   
   ///@param asset ERC20 token address

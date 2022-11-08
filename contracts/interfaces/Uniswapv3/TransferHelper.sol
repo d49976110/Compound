@@ -19,8 +19,6 @@ library TransferHelper {
     ) internal {
         (bool success, bytes memory data) =
             token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
-        console.log("success",success);
-        console.log("data.length",data.length);
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'STF');
     }
 

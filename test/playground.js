@@ -25,8 +25,11 @@ async function deployContracts() {
     let SingleSwap = await ethers.getContractFactory("TestSingleSwap");
     singlwswap = await SingleSwap.deploy(UNISWAP_ROUTER);
 
-    let Flashloan = await ethers.getContractFactory("TestAaveFlashLoan");
-    flashloan = await Flashloan.deploy(ADDRESS_PROVIDER, singlwswap.address);
+    let Flashloan = await ethers.getContractFactory(
+        "TestAaveFlashLoan_withUniswap"
+    );
+    // aave provider、uniswap router、cToken address
+    flashloan = await Flashloan.deploy(ADDRESS_PROVIDER, UNISWAP_ROUTER);
 }
 
 describe("Token contract", function () {
@@ -51,8 +54,8 @@ describe("Token contract", function () {
             [-USDCAmount, USDCAmount]
         );
     });
-    //            swap                                   swap
-    //flow = USDC  ->  UNI  -> liquidate -> cUni ->  UNI  -> USDC
+    //           liquidate      redeem       swap
+    //flow = USDC   ->    cUni    ->    UNI   ->  USDC
     it("Execute flashloan", async () => {
         console.log(
             "pre USDC balance (flashloan)",
