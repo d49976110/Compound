@@ -80,11 +80,12 @@ contract UniswapAnchoredView is UniswapConfig {
     /**
      * @notice Construct a uniswap anchored view for a set of token configurations
      * @dev Note that to avoid immature TWAPs, the system must run for at least a single anchorPeriod before using.
-     * @param reporter_ The reporter whose prices are to be used
+     * @param reporter_ The reporter whose prices are to be used, DEX & CEX, like coinbase
      * @param anchorToleranceMantissa_ The percentage tolerance that the reporter may deviate from the uniswap anchor
      * @param anchorPeriod_ The minimum amount of time required for the old uniswap price accumulator to be replaced
      * @param configs The static token configurations which define what prices are supported and how
      */
+
     constructor(
         OpenOraclePriceData priceData_,
         address reporter_,
@@ -114,6 +115,8 @@ contract UniswapAnchoredView is UniswapConfig {
                     "reported prices must have an anchor"
                 );
                 bytes32 symbolHash = config.symbolHash;
+
+                //計算uniswap返回的cumulative價格
                 uint256 cumulativePrice = currentCumulativePrice(config);
                 oldObservations[symbolHash].timestamp = block.timestamp;
                 newObservations[symbolHash].timestamp = block.timestamp;
@@ -188,6 +191,7 @@ contract UniswapAnchoredView is UniswapConfig {
      * @param signatures The signatures for the corresponding messages
      * @param symbols The symbols to compare to anchor for authoritative reading
      */
+    // 讓每個人可以花費gas就將oracle的price發佈到鏈上
     function postPrices(
         bytes[] calldata messages,
         bytes[] calldata signatures,
@@ -226,6 +230,7 @@ contract UniswapAnchoredView is UniswapConfig {
         if (symbolHash == ethHash) {
             anchorPrice = ethPrice;
         } else {
+            // 取得該token在uniswap的cumulative價格，並計算其平均值
             anchorPrice = fetchAnchorPrice(symbol, config, ethPrice);
         }
 
@@ -295,7 +300,7 @@ contract UniswapAnchoredView is UniswapConfig {
      * @param conversionFactor 1e18 if seeking the ETH price, and a 6 decimal ETH-USDC price in the case of other assets
      */
 
-    //使用新的累積價格扣除就的累積價格，計算該段時間的平均價格
+    //使用新的累積價格扣除舊的累積價格，計算該段時間的平均價格
     function fetchAnchorPrice(
         string memory symbol,
         TokenConfig memory config,
