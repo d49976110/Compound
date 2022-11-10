@@ -2,11 +2,11 @@
 pragma solidity ^0.8.10;
 pragma abicoder v2;
 
-import '../interfaces/Uniswapv3/ISwapRouter.sol';
-import '../interfaces/Uniswapv3/TransferHelper.sol';
+import "../../interfaces/Uniswapv3/ISwapRouter.sol";
+import "../../interfaces/Uniswapv3/TransferHelper.sol";
 import "hardhat/console.sol";
 
-contract TestSingleSwap{
+contract TestSingleSwap {
     ISwapRouter public immutable swapRouter;
 
     // address public constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
@@ -20,18 +20,26 @@ contract TestSingleSwap{
         swapRouter = _swapRouter;
     }
 
-    function swapExactInputSingle_USDC(uint256 amountIn) external returns (uint256 amountOut) {
+    function swapExactInputSingle_USDC(uint256 amountIn)
+        external
+        returns (uint256 amountOut)
+    {
         // msg.sender must approve this contract
         // Transfer the specified amount of DAI to this contract.
-        TransferHelper.safeTransferFrom(USDC, msg.sender, address(this), amountIn);
+        TransferHelper.safeTransferFrom(
+            USDC,
+            msg.sender,
+            address(this),
+            amountIn
+        );
 
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(USDC, address(swapRouter), amountIn);
-        
+
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
                 tokenIn: USDC,
                 tokenOut: UNI,
                 fee: poolFee,
@@ -44,21 +52,28 @@ contract TestSingleSwap{
 
         // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
-        
     }
 
-    function swapExactInputSingle_UNI(uint256 amountIn) external returns (uint256 amountOut) {
+    function swapExactInputSingle_UNI(uint256 amountIn)
+        external
+        returns (uint256 amountOut)
+    {
         // msg.sender must approve this contract
         // Transfer the specified amount of DAI to this contract.
-        TransferHelper.safeTransferFrom(UNI, msg.sender, address(this), amountIn);
+        TransferHelper.safeTransferFrom(
+            UNI,
+            msg.sender,
+            address(this),
+            amountIn
+        );
 
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(UNI, address(swapRouter), amountIn);
-        
+
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
                 tokenIn: UNI,
                 tokenOut: USDC,
                 fee: poolFee,
@@ -72,6 +87,4 @@ contract TestSingleSwap{
         // The call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
     }
-
-
 }

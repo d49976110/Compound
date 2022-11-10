@@ -15,6 +15,9 @@ npm install
 // homework 1 ~ 5
 npx hardhat test test/compound.js
 
+// homework 6 flashloan
+npx hardhat test test/flashloan.js
+
 // GovernorBravo
 npx hardhat test test/GovernorBravo.js
 ```

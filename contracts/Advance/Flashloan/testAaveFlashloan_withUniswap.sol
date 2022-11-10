@@ -1,21 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import "../interfaces/Uniswapv3/ISwapRouter.sol";
-import "../interfaces/AAVE/FlashLoanReceiverBase.sol";
-import "../CErc20.sol";
+// import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "../../interfaces/Uniswapv3/ISwapRouter.sol";
+import "../../interfaces/AAVE/FlashLoanReceiverBase.sol";
+// import "./testUniswapSingleSwap.sol";
 import "hardhat/console.sol";
 
-contract AaveFlashLoan is FlashLoanReceiverBase {
+contract TestAaveFlashLoan_withUniswap is FlashLoanReceiverBase {
     using SafeMath for uint256;
 
-    // Uniswap
     ISwapRouter public immutable swapRouter;
-    CErc20 public immutable cUSDC;
-    CErc20 public immutable cUNI;
-    address public borrower;
-    uint256 public repayAmount;
 
+    // Uniswap
     address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     uint24 public constant poolFee = 3000;
@@ -24,22 +21,16 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
     constructor(
         ILendingPoolAddressesProvider _addressProvider,
-        ISwapRouter _swapRouter,
-        CErc20 _cUSDC,
-        CErc20 _cUNI,
-        address _borrower,
-        uint256 _repayAmount
+        ISwapRouter _swapRouter
     ) FlashLoanReceiverBase(_addressProvider) {
         swapRouter = ISwapRouter(_swapRouter);
-        cUSDC = CErc20(_cUSDC);
-        cUNI = CErc20(_cUNI);
-        borrower = _borrower;
-        repayAmount = _repayAmount;
     }
 
     ///@param asset ERC20 token address
     ///@param amount loan amount
-    function flashLoan(address asset, uint256 amount) external {
+    function testFlashLoan(address asset, uint256 amount) external {
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        require(bal > amount, "bal <= amount");
         address receiver = address(this);
 
         address[] memory assets = new address[](1);
@@ -76,34 +67,40 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        // approve cUSDC to use addr1 USDC
-        IERC20(USDC).approve(address(cUSDC), repayAmount);
+        // approve this address for uniswap using USDC
+        IERC20(assets[0]).approve(address(swapRouter), amounts[0]);
 
-        // use USDC to liquidate
-        cUSDC.liquidateBorrow(borrower, repayAmount, cUNI);
+        // exchange from USDC to UNI
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: USDC,
+                tokenOut: UNI,
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amounts[0],
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+        uint256 amountOut_UNI = swapRouter.exactInputSingle(params);
 
-        // redeem from cUNI to UNI
-        cUNI.redeem(cUNI.balanceOf(address(this)));
-
-        uint256 uniBalance = IERC20(UNI).balanceOf(address(this));
-        // swap from UNI to USDC
         // approve this address for uniswap using UNI
-        IERC20(UNI).approve(address(swapRouter), uniBalance);
+        IERC20(UNI).approve(address(swapRouter), amountOut_UNI);
 
         // exchange from UNI to USDC
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+        ISwapRouter.ExactInputSingleParams memory params_UNI = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: UNI,
                 tokenOut: USDC,
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: uniBalance,
+                amountIn: amountOut_UNI,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
             });
 
-        uint256 amountOut_USDC = swapRouter.exactInputSingle(params);
+        uint256 amountOut_USDC = swapRouter.exactInputSingle(params_UNI);
 
         for (uint256 i = 0; i < assets.length; i++) {
             //歸還數量需要加上手續費，AAVE手續費為萬分之9

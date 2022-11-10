@@ -20,7 +20,7 @@ const uniAddress = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984";
 let USDCAmount = 50n * 10n ** 6n;
 
 async function deployContracts() {
-    [owner, addr1, addr2] = await ethers.getSigners();
+    [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
     usdc = await ethers.getContractAt("ERC20", usdcAddress);
     uni = await ethers.getContractAt("ERC20", uniAddress);
@@ -92,5 +92,20 @@ describe("Playground", function () {
 
         // console.log("after usdc balance", await usdc.balanceOf(owner.address));
         // console.log("after uni balance", await uni.balanceOf(owner.address));
+    });
+
+    it("Sign message", async () => {
+        let SimpleSign = await ethers.getContractFactory("SimpleSign");
+        let simpleSign = await SimpleSign.deploy();
+
+        await simpleSign.getMessageHash();
+        let data = await simpleSign.data();
+
+        //由於data回傳值是string，要將它轉成bytes，透過加上陣列的方式，讓他看起來像是bytes => ethers.utils.arrayify()
+        let signature = await owner.signMessage(ethers.utils.arrayify(data));
+
+        let address = await simpleSign.getAddress(data, signature);
+
+        expect(address).to.eq(owner.address);
     });
 });
