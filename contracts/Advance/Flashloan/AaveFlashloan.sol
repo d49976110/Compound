@@ -9,6 +9,9 @@ import "hardhat/console.sol";
 contract AaveFlashLoan is FlashLoanReceiverBase {
     using SafeMath for uint256;
 
+    //admin
+    address public admin;
+
     // Uniswap
     ISwapRouter public immutable swapRouter;
     CErc20 public immutable cUSDC;
@@ -18,9 +21,14 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
     address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    uint24 public constant poolFee = 3000;
+    uint24 public constant POOLFEE = 3000;
 
     event Log(string message, uint256 val);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin);
+        _;
+    }
 
     constructor(
         ILendingPoolAddressesProvider _addressProvider,
@@ -35,11 +43,13 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         cUNI = CErc20(_cUNI);
         borrower = _borrower;
         repayAmount = _repayAmount;
+
+        admin = msg.sender;
     }
 
     ///@param asset ERC20 token address
     ///@param amount loan amount
-    function flashLoan(address asset, uint256 amount) external {
+    function flashLoan(address asset, uint256 amount) external onlyAdmin {
         address receiver = address(this);
 
         address[] memory assets = new address[](1);
@@ -76,6 +86,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
+        require(msg.sender == address(LENDING_POOL), "Not lenging pool");
         // approve cUSDC to use addr1 USDC
         IERC20(USDC).approve(address(cUSDC), repayAmount);
 
@@ -91,11 +102,11 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         IERC20(UNI).approve(address(swapRouter), uniBalance);
 
         // exchange from UNI to USDC
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+        ISwapRouter.ExactInputSingleParams memory uniswapParams = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: UNI,
                 tokenOut: USDC,
-                fee: poolFee,
+                fee: POOLFEE,
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: uniBalance,
@@ -103,7 +114,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
                 sqrtPriceLimitX96: 0
             });
 
-        uint256 amountOut_USDC = swapRouter.exactInputSingle(params);
+        uint256 amountOut_USDC = swapRouter.exactInputSingle(uniswapParams);
 
         for (uint256 i = 0; i < assets.length; i++) {
             //歸還數量需要加上手續費，AAVE手續費為萬分之9

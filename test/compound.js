@@ -10,7 +10,7 @@ let unitroller, Comptroller, comptroller, interestRateModel, oracle;
 let tokenAmount = BigInt(1000 * 1e18);
 let supplyAmount = BigInt(100 * 1e18);
 
-let tokenBmount = BigInt(1 * 1e18);
+let tokenBAmount = BigInt(1 * 1e18);
 let borrowAmount_A_from_B = BigInt(50 * 1e18);
 
 let decimals = 18;
@@ -162,10 +162,10 @@ describe("Compound liquidate with change collateral factor", async () => {
         });
 
         it("owner mint approve tokenB and mint cTokenB first", async () => {
-            await tokenB.mint(tokenBmount);
-            await tokenB.approve(cTokenB.address, tokenBmount);
-            await cTokenB.mint(tokenBmount);
-            expect(await cTokenB.balanceOf(owner.address)).to.eq(tokenBmount);
+            await tokenB.mint(tokenBAmount);
+            await tokenB.approve(cTokenB.address, tokenBAmount);
+            await cTokenB.mint(tokenBAmount);
+            expect(await cTokenB.balanceOf(owner.address)).to.eq(tokenBAmount);
         });
 
         it("enter ctokenB to markets", async () => {
@@ -235,10 +235,21 @@ describe("Compound liquidate with change collateral factor", async () => {
             let repayAmount =
                 (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
+            // before addr1 ctokenB balance = 0
+            expect(await cTokenB.balanceOf(addr1.address)).to.eq(0);
+
             //協助償還借貸資產，到借出的cToken合約，執行liquidateBorrow，第一個參數為被清算人，第二為協助清算資產數量，第三個為抵押資產的cToken地址
             await cTokenA
                 .connect(addr1)
                 .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
+
+            // after addr1 ctokenB balance should > 0
+            expect(await cTokenB.balanceOf(addr1.address)).to.gt(0);
+
+            // owner current borrow balance should less than origin borrow balance
+            expect(
+                await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
+            ).to.lt(borrowBalance);
         });
     });
 });
@@ -256,32 +267,38 @@ describe("Compound liquidate with change oracle", async () => {
 
         it("admin set oracle & comptroller", async () => {
             await setcomptroller();
-        });
 
-        it("enter ctokenB to markets", async () => {
+            //enter ctokenB to markets
             await comptroller.enterMarkets([cTokenB.address]);
-        });
+            let markets = await comptroller.markets(cTokenB.address);
 
-        it("addr1 mint some tokenA and approve for cTokenA contract", async () => {
+            expect(markets[0]).to.eq(true);
+
+            //addr1 mint some tokenA and approve for cTokenA contract
             await tokenA.connect(addr1).mint(supplyAmount + tokenAmount);
             await tokenA
                 .connect(addr1)
                 .approve(cTokenA.address, supplyAmount + tokenAmount);
-        });
 
-        it("addr1 supply tokenA for cTokenA", async () => {
+            expect(
+                await tokenA.allowance(addr1.address, cTokenA.address)
+            ).to.eq(supplyAmount + tokenAmount);
+
+            //addr1 supply tokenA for cTokenA
             await cTokenA.connect(addr1).mint(supplyAmount);
             expect(await cTokenA.balanceOf(addr1.address)).to.eq(supplyAmount);
-        });
 
-        it("owner mint tokenB and approve for cTokenB contract", async () => {
-            await tokenB.mint(tokenBmount);
-            await tokenB.approve(cTokenB.address, tokenBmount);
-        });
+            //owner mint tokenB and approve for cTokenB contract
+            await tokenB.mint(tokenBAmount);
+            await tokenB.approve(cTokenB.address, tokenBAmount);
+            expect(
+                await tokenB.allowance(owner.address, cTokenB.address)
+            ).to.eq(tokenBAmount);
 
-        it("owner supply tokenB for cTokenB ", async () => {
-            await cTokenB.mint(tokenBmount);
-            expect(await cTokenB.balanceOf(owner.address)).to.eq(tokenBmount);
+            //owner supply tokenB for cTokenB
+            await cTokenB.mint(tokenBAmount);
+
+            expect(await cTokenB.balanceOf(owner.address)).to.eq(tokenBAmount);
         });
     });
 
@@ -309,6 +326,9 @@ describe("Compound liquidate with change oracle", async () => {
                 owner.address
             );
 
+            // before addr1 ctokenB balance = 0
+            expect(await cTokenB.balanceOf(addr1.address)).to.eq(0);
+
             let repayAmount =
                 (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
@@ -316,11 +336,22 @@ describe("Compound liquidate with change oracle", async () => {
             await cTokenA
                 .connect(addr1)
                 .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
+
+            // after addr1 ctokenB balance should > 0
+            expect(await cTokenB.balanceOf(addr1.address)).to.gt(0);
+
+            // owner current borrow balance should less than origin borrow balance
+            expect(
+                await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
+            ).to.lt(borrowBalance);
         });
+
         it("addr1 liquidate owner again", async () => {
             let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
                 owner.address
             );
+
+            let addr1CTokenBBalance = await cTokenB.balanceOf(addr1.address);
 
             let repayAmount =
                 (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
@@ -328,6 +359,16 @@ describe("Compound liquidate with change oracle", async () => {
             await cTokenA
                 .connect(addr1)
                 .liquidateBorrow(owner.address, repayAmount, cTokenB.address);
+
+            // after addr1 ctokenB balance should > 0
+            expect(await cTokenB.balanceOf(addr1.address)).to.gt(
+                addr1CTokenBBalance
+            );
+
+            // owner current borrow balance should less than origin borrow balance
+            expect(
+                await cTokenA.callStatic.borrowBalanceCurrent(owner.address)
+            ).to.lt(borrowBalance);
         });
     });
 });

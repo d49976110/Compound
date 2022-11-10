@@ -209,9 +209,9 @@ describe("Flashloan", async () => {
 
             repayAmount = (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
-            // create flashloan contract
+            // addr1 create flashloan contract
             let Flashloan = await ethers.getContractFactory("AaveFlashLoan");
-            flashloan = await Flashloan.deploy(
+            flashloan = await Flashloan.connect(addr1).deploy(
                 ADDRESS_PROVIDER,
                 UNISWAP_ROUTER,
                 cTokenA.address,
