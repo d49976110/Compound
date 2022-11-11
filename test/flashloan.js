@@ -227,11 +227,7 @@ describe("Flashloan", async () => {
             // execute => addr1 to liquidate owner
             await flashloan.connect(addr1).flashLoan(usdcAddress, repayAmount);
 
-            expect(await usdc.balanceOf(flashloan.address)).to.gt(0);
-            // console.log(
-            //     "USDC balance",
-            //     await usdc.balanceOf(flashloan.address)
-            // );
+            expect(await usdc.balanceOf(addr1.address)).to.gt(0);
         });
     });
 });

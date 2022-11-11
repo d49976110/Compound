@@ -65,7 +65,9 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
         address onBehalfOf = address(this);
 
-        bytes memory params = ""; // extra data to pass abi.encode(...)
+        // let params become function selector
+        bytes memory params = abi.encode(IERC20.transfer.selector);
+
         uint16 referralCode = 0;
 
         LENDING_POOL.flashLoan(
@@ -123,6 +125,18 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
             //歸還數量需要加上手續費，AAVE手續費為萬分之9
             uint256 amountOwing = amounts[i].add(premiums[i]);
             IERC20(assets[i]).approve(address(LENDING_POOL), amountOwing);
+
+            // try use params to transfer rest USDC to msg.sender
+            uint256 leftBalance = amountOut_USDC - amountOwing;
+            bytes memory callData = abi.encodeWithSelector(
+                bytes4(params),
+                admin,
+                leftBalance
+            );
+            {
+                address(USDC).call(callData);
+                // assets[i].call(callData);
+            }
         }
 
         return true;
