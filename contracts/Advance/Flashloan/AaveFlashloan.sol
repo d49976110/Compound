@@ -79,6 +79,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         );
     }
 
+    /// @param initiator this contract address
     function executeOperation(
         address[] calldata assets,
         uint256[] calldata amounts,
@@ -86,7 +87,8 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        require(msg.sender == address(LENDING_POOL), "Not lenging pool");
+        require(msg.sender == address(LENDING_POOL), "Not Lending Pool");
+        require(initiator == address(this), "Initiator Invalid");
         // approve cUSDC to use addr1 USDC
         IERC20(USDC).approve(address(cUSDC), repayAmount);
 
@@ -97,6 +99,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         cUNI.redeem(cUNI.balanceOf(address(this)));
 
         uint256 uniBalance = IERC20(UNI).balanceOf(address(this));
+
         // swap from UNI to USDC
         // approve this address for uniswap using UNI
         IERC20(UNI).approve(address(swapRouter), uniBalance);
