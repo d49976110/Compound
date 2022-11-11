@@ -121,21 +121,25 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
         uint256 amountOut_USDC = swapRouter.exactInputSingle(uniswapParams);
 
-        for (uint256 i = 0; i < assets.length; i++) {
-            //歸還數量需要加上手續費，AAVE手續費為萬分之9
-            uint256 amountOwing = amounts[i].add(premiums[i]);
-            IERC20(assets[i]).approve(address(LENDING_POOL), amountOwing);
+        {
+            address[] memory tempAssets = assets;
+            for (uint256 i = 0; i < tempAssets.length; i++) {
+                //歸還數量需要加上手續費，AAVE手續費為萬分之9
+                uint256 amountOwing = amounts[i].add(premiums[i]);
+                IERC20(tempAssets[i]).approve(
+                    address(LENDING_POOL),
+                    amountOwing
+                );
 
-            // try use params to transfer rest USDC to msg.sender
-            uint256 leftBalance = amountOut_USDC - amountOwing;
-            bytes memory callData = abi.encodeWithSelector(
-                bytes4(params),
-                admin,
-                leftBalance
-            );
-            {
-                address(USDC).call(callData);
-                // assets[i].call(callData);
+                // try use params to transfer rest USDC to msg.sender
+                uint256 leftBalance = amountOut_USDC - amountOwing;
+                bytes memory callData = abi.encodeWithSelector(
+                    bytes4(params),
+                    admin,
+                    leftBalance
+                );
+
+                tempAssets[i].call(callData);
             }
         }
 
