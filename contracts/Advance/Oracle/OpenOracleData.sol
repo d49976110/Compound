@@ -3,6 +3,8 @@
 pragma solidity ^0.6.10;
 pragma experimental ABIEncoderV2;
 
+import "hardhat/console.sol";
+
 /**
  * @title The Open Oracle Data Base Contract
  * @author Compound Labs, Inc.
@@ -39,13 +41,14 @@ contract OpenOracleData {
      */
     function source(bytes memory message, bytes memory signature)
         public
-        pure
         returns (address)
     {
-        (bytes32 r, bytes32 s, uint8 v) = abi.decode(
-            signature,
-            (bytes32, bytes32, uint8)
-        );
+        (bytes32 r, bytes32 s, uint8 v) = splitSignature(signature);
+        // (bytes32 r, bytes32 s, uint8 v) = abi.decode(
+        //     signature,
+        //     (bytes32, bytes32, uint8)
+        // );
+
         bytes32 hash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n32",
@@ -53,5 +56,23 @@ contract OpenOracleData {
             )
         );
         return ecrecover(hash, v, r, s);
+    }
+
+    function splitSignature(bytes memory sig)
+        public
+        view
+        returns (
+            bytes32 r,
+            bytes32 s,
+            uint8 v
+        )
+    {
+        require(sig.length == 65, "invalid signature length");
+
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := byte(0, mload(add(sig, 96)))
+        }
     }
 }

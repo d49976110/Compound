@@ -8,12 +8,7 @@ contract SimpleSign {
 
     function getMessageHash() external returns (bytes32) {
         data = keccak256(
-            abi.encodePacked(
-                "kind",
-                uint64(block.timestamp),
-                "key",
-                uint64(100)
-            )
+            abi.encodePacked("kind", uint64(1), "key", uint64(100))
         );
         return data;
     }

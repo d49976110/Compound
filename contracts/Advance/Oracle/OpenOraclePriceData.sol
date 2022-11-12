@@ -78,7 +78,6 @@ contract OpenOraclePriceData is OpenOracleData {
 
     function decodeMessage(bytes calldata message, bytes calldata signature)
         internal
-        pure
         returns (
             address,
             uint64,

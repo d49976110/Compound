@@ -185,7 +185,45 @@ describe("Playground", function () {
         expect(address).to.eq(owner.address);
     });
 
+    it("sign data using oraclePriceData ", async () => {
+        // get oraclePriceData
+        const OraclePriceData = await ethers.getContractFactory(
+            "OpenOraclePriceData"
+        );
+        const oraclePriceData = await OraclePriceData.deploy();
+
+        let message = ethers.utils.defaultAbiCoder.encode(
+            ["bytes32", "bytes32", "uint8"],
+            [
+                "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa",
+                "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa",
+                1,
+            ]
+        );
+
+        let hashData = ethers.utils.solidityKeccak256(["bytes"], [message]);
+
+        //由於data回傳值是string，要將它轉成bytes，透過加上陣列的方式，讓他看起來像是bytes => ethers.utils.arrayify()
+        let signature = await owner.signMessage(
+            ethers.utils.arrayify(hashData)
+        );
+
+        //因為source的abi.encodePacked是keccak256(message)，所以須傳入尚未hash的message
+        let sourceDataAddress = await oraclePriceData.callStatic.source(
+            message,
+            signature
+        );
+
+        expect(sourceDataAddress).to.eq(owner.address);
+    });
+
     it("set up uniswap anchored view", async () => {
+        // get oraclePriceData
+        const OraclePriceData = await ethers.getContractFactory(
+            "OpenOraclePriceData"
+        );
+        const oraclePriceData = await OraclePriceData.deploy();
+
         // get the uniswap USDC & UNI pool address
         const uniswapV2Factory = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f";
         const uniswapFactory = await ethers.getContractAt(
@@ -198,15 +236,11 @@ describe("Playground", function () {
         );
 
         // set the uniswap anchored view constructor
-
         let byte = ethers.utils.solidityPack(["string"], ["USDC"]);
         let symbolhash = ethers.utils.solidityKeccak256(["bytes"], [byte]);
-        console.log("byte", byte);
-        console.log("symbolhash", symbolhash);
 
         const uniswapMarket = poolAddress;
 
-        let priceData = owner.address;
         let reporter = owner.address;
         let anchoredTolerance = 0;
         let anchoredPeriod = 0;
@@ -230,20 +264,14 @@ describe("Playground", function () {
         );
 
         let uniswapAnchored = await UniswapAnchored.deploy(
-            priceData,
+            oraclePriceData.address,
             reporter,
             anchoredTolerance,
             anchoredPeriod,
             configs
         );
-        console.log("anchored", uniswapAnchored.address);
-
-        // let data = await uniswapAnchored.getTokenConfigByCToken(
-        //     cTokenA.address
-        // );
-        // console.log("data", data);
 
         let data = await uniswapAnchored.getTokenConfigBySymbol("USDC");
-        console.log("data", data);
+        // console.log("data", data);
     });
 });
