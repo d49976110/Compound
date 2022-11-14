@@ -21,7 +21,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
     address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    uint24 public constant POOLFEE = 3000;
+    uint24 public constant UNI_POOLFEE = 3000;
 
     event Log(string message, uint256 val);
 
@@ -65,7 +65,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
         address onBehalfOf = address(this);
 
-        // let params become function selector
+        //Practice : let params become function selector
         bytes memory params = abi.encode(IERC20.transfer.selector);
 
         uint16 referralCode = 0;
@@ -111,7 +111,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
             .ExactInputSingleParams({
                 tokenIn: UNI,
                 tokenOut: USDC,
-                fee: POOLFEE,
+                fee: UNI_POOLFEE,
                 recipient: address(this),
                 deadline: block.timestamp,
                 amountIn: uniBalance,
@@ -131,7 +131,7 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
                     amountOwing
                 );
 
-                // try use params to transfer rest USDC to msg.sender
+                //Practice : try use params to transfer rest USDC to msg.sender
                 uint256 leftBalance = amountOut_USDC - amountOwing;
                 bytes memory callData = abi.encodeWithSelector(
                     bytes4(params),

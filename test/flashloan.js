@@ -18,7 +18,7 @@ let UNIAmount = BigInt(1000 * 1e18); // tokenB
 const binanceAddress = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
 const usdcAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // token A
 const uniAddress = "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"; // token B
-const ADDRESS_PROVIDER = "0xB53C1a33016B2DC2fF3653530bfF1848a515c8c5";
+const AAVE_ADDRESS_PROVIDER = "0xB53C1a33016B2DC2fF3653530bfF1848a515c8c5";
 const UNISWAP_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 
 // let decimals = 6;
@@ -197,11 +197,13 @@ describe("Flashloan", async () => {
             expect(result[1]).to.eq(0);
             expect(result[2]).to.gt(0);
         });
+
         /*
         flow: 
                 flashloan     liquidate      redeem       swap
             aave    ->    USDC   ->    cUni    ->    UNI   ->  USDC
         */
+
         it("create flashloan contract", async () => {
             let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
                 owner.address
@@ -212,7 +214,7 @@ describe("Flashloan", async () => {
             // addr1 create flashloan contract
             let Flashloan = await ethers.getContractFactory("AaveFlashLoan");
             flashloan = await Flashloan.connect(addr1).deploy(
-                ADDRESS_PROVIDER,
+                AAVE_ADDRESS_PROVIDER,
                 UNISWAP_ROUTER,
                 cTokenA.address,
                 cTokenB.address,
@@ -221,12 +223,14 @@ describe("Flashloan", async () => {
             );
         });
 
-        it("execute flashloan", async () => {
+        it("execute flashloan & addr1 should receive USDC not flashloan contract", async () => {
             expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
 
             // execute => addr1 to liquidate owner
             await flashloan.connect(addr1).flashLoan(usdcAddress, repayAmount);
 
+            // using params to call "transfer()" from flashloan contract to addr1
+            expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
             expect(await usdc.balanceOf(addr1.address)).to.gt(0);
         });
     });
