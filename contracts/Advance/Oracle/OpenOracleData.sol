@@ -55,6 +55,7 @@ contract OpenOracleData {
                 keccak256(message)
             )
         );
+
         return ecrecover(hash, v, r, s);
     }
 

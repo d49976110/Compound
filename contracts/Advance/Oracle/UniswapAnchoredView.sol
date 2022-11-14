@@ -85,7 +85,7 @@ contract UniswapAnchoredView is UniswapConfig {
      * @param anchorPeriod_ The minimum amount of time required for the old uniswap price accumulator to be replaced
      * @param configs The static token configurations which define what prices are supported and how
      */
-
+    // config在uniswapConfig內透過初始化先處理完成
     constructor(
         OpenOraclePriceData priceData_,
         address reporter_,
@@ -109,6 +109,7 @@ contract UniswapAnchoredView is UniswapConfig {
             TokenConfig memory config = configs[i];
             require(config.baseUnit > 0, "baseUnit must be greater than zero");
             address uniswapMarket = config.uniswapMarket;
+            // PriceSource is enum
             if (config.priceSource == PriceSource.REPORTER) {
                 require(
                     uniswapMarket != address(0),
@@ -118,6 +119,7 @@ contract UniswapAnchoredView is UniswapConfig {
 
                 //計算uniswap返回的cumulative價格
                 uint256 cumulativePrice = currentCumulativePrice(config);
+
                 oldObservations[symbolHash].timestamp = block.timestamp;
                 newObservations[symbolHash].timestamp = block.timestamp;
                 oldObservations[symbolHash].acc = cumulativePrice;

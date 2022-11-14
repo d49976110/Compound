@@ -34,7 +34,7 @@ contract OpenOraclePriceData is OpenOracleData {
      * @dev The most recent authenticated data from all sources.
      *  This is private because dynamic mapping keys preclude auto-generated getters.
      */
-    mapping(address => mapping(string => Datum)) private data;
+    mapping(address => mapping(string => Datum)) public data;
 
     /**
      * @notice Write a bunch of signed datum to the authenticated storage mapping
@@ -52,6 +52,7 @@ contract OpenOraclePriceData is OpenOracleData {
             string memory key,
             uint64 value
         ) = decodeMessage(message, signature);
+
         return putInternal(source, timestamp, key, value);
     }
 
@@ -63,6 +64,7 @@ contract OpenOraclePriceData is OpenOracleData {
     ) internal returns (string memory) {
         // Only update if newer than stored, according to source
         Datum storage prior = data[source][key];
+
         if (
             timestamp > prior.timestamp &&
             timestamp < block.timestamp + 60 minutes &&
@@ -95,11 +97,13 @@ contract OpenOraclePriceData is OpenOracleData {
             string memory key,
             uint64 value
         ) = abi.decode(message, (string, uint64, string, uint64));
+
         require(
             keccak256(abi.encodePacked(kind)) ==
                 keccak256(abi.encodePacked("prices")),
             "Kind of data must be 'prices'"
         );
+
         return (source, timestamp, key, value);
     }
 
