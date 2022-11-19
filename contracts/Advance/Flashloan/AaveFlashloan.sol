@@ -2,6 +2,7 @@
 pragma solidity ^0.8.10;
 
 import "../../interfaces/Uniswapv3/ISwapRouter.sol";
+import "../../interfaces/Uniswapv3/IQuoter.sol";
 import "../../interfaces/AAVE/FlashLoanReceiverBase.sol";
 import "../../CErc20.sol";
 import "hardhat/console.sol";
@@ -14,6 +15,8 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
     // Uniswap
     ISwapRouter public immutable swapRouter;
+    IQuoter public immutable quoter =
+        IQuoter(0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
     CErc20 public immutable cUSDC;
     CErc20 public immutable cUNI;
     address public borrower;
@@ -22,6 +25,12 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
     address public constant UNI = 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984;
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     uint24 public constant UNI_POOLFEE = 3000;
+
+    //params
+    struct MyStruct {
+        address _address;
+        uint256 _number;
+    }
 
     event Log(string message, uint256 val);
 
@@ -65,8 +74,9 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
 
         address onBehalfOf = address(this);
 
+        MyStruct memory mystruct = MyStruct(msg.sender, 123);
         //Practice : let params become function selector
-        bytes memory params = abi.encode(IERC20.transfer.selector);
+        bytes memory params = abi.encode(mystruct);
 
         uint16 referralCode = 0;
 
@@ -106,6 +116,18 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
         // approve this address for uniswap using UNI
         IERC20(UNI).approve(address(swapRouter), uniBalance);
 
+        {
+            uint256 tempUniBalance = uniBalance;
+            uint256 expectAmountOutUSDC = quoter.quoteExactInputSingle(
+                UNI,
+                USDC,
+                UNI_POOLFEE,
+                tempUniBalance,
+                0
+            );
+
+            console.log("expect amount out USDC:", expectAmountOutUSDC);
+        }
         // exchange from UNI to USDC
         ISwapRouter.ExactInputSingleParams memory uniswapParams = ISwapRouter
             .ExactInputSingleParams({
@@ -119,29 +141,29 @@ contract AaveFlashLoan is FlashLoanReceiverBase {
                 sqrtPriceLimitX96: 0
             });
 
-        uint256 amountOut_USDC = swapRouter.exactInputSingle(uniswapParams);
+        uint256 amountOutUSDC = swapRouter.exactInputSingle(uniswapParams);
+        console.log("real amount out USDC", amountOutUSDC);
 
+        //Practice decode
         {
-            address[] memory tempAssets = assets;
-            for (uint256 i = 0; i < tempAssets.length; i++) {
-                //歸還數量需要加上手續費，AAVE手續費為萬分之9
-                uint256 amountOwing = amounts[i].add(premiums[i]);
-                IERC20(tempAssets[i]).approve(
-                    address(LENDING_POOL),
-                    amountOwing
-                );
-
-                //Practice : try use params to transfer rest USDC to msg.sender
-                uint256 leftBalance = amountOut_USDC - amountOwing;
-                bytes memory callData = abi.encodeWithSelector(
-                    bytes4(params),
-                    admin,
-                    leftBalance
-                );
-
-                tempAssets[i].call(callData);
-            }
+            MyStruct memory mystruct = abi.decode(params, (MyStruct));
+            assert(mystruct._address == tx.origin);
+            assert(mystruct._number == 123);
         }
+
+        // becasue we set asset array only 1
+        uint256 amountOwing = amounts[0].add(premiums[0]);
+        IERC20(assets[0]).approve(address(LENDING_POOL), amountOwing);
+
+        uint256 leftBalance = amountOutUSDC - amountOwing;
+        bytes memory callData = abi.encodeWithSelector(
+            bytes4(params),
+            admin,
+            leftBalance
+        );
+
+        // send back to user
+        IERC20(assets[0]).transfer(admin, leftBalance);
 
         return true;
     }

@@ -124,7 +124,7 @@ async function setcomptroller() {
     // token B
 }
 
-describe("Flashloan", async () => {
+describe("# Flashloan", async () => {
     before(async () => {
         await deployContracts();
     });
@@ -231,7 +231,15 @@ describe("Flashloan", async () => {
 
             // using params to call "transfer()" from flashloan contract to addr1
             expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
-            expect(await usdc.balanceOf(addr1.address)).to.gt(0);
+
+            expect(
+                Math.floor(
+                    ethers.utils.formatUnits(
+                        await usdc.balanceOf(addr1.address),
+                        6
+                    )
+                )
+            ).to.eq(121);
         });
     });
 });
