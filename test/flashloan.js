@@ -1,8 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const {
-    impersonateAccount,
-} = require("@nomicfoundation/hardhat-network-helpers");
+const { impersonateAccount } = require("@nomicfoundation/hardhat-network-helpers");
 const { Logger, LogLevel } = require("@ethersproject/logger");
 
 Logger.setLogLevel(LogLevel.ERROR);
@@ -50,9 +48,7 @@ async function deployContracts() {
     uni = await ethers.getContractAt("ERC20", uniAddress);
 
     // create interest model
-    let InterestRateModel = await ethers.getContractFactory(
-        "WhitePaperInterestRateModel"
-    );
+    let InterestRateModel = await ethers.getContractFactory("WhitePaperInterestRateModel");
     interestRateModel = await InterestRateModel.deploy(0, 0);
 
     //create comptroller
@@ -68,40 +64,18 @@ async function deployContracts() {
     unitroller = await Unitroller.deploy();
 
     await unitroller._setPendingImplementation(comptroller.address);
-    await unitroller._acceptImplementation();
+    // await unitroller._acceptImplementation();
 
-    await comptroller._become(unitroller.address);
+    await comptroller._become(unitroller.address); // unitroller can't _acceptImplementation() by itself, it need through comptroller using _become()
 
-    comptroller = await Comptroller.attach(unitroller.address); // comptroller is a proxy => using unitroller address but use comptroller abi
+    comptroller = await Comptroller.attach(unitroller.address); // comptroller is a logic contract => using unitroller(proxy contract) address but use comptroller abi
 
     // create cTokenA & cTokenB
     let CERC20 = await ethers.getContractFactory("CErc20Delegate"); // logic implementation
     cerc20 = await CERC20.deploy();
     let delegator = await ethers.getContractFactory("CErc20Delegator"); // proxy contract
-    cTokenA = await delegator.deploy(
-        usdcAddress,
-        comptroller.address,
-        interestRateModel.address,
-        exchangeRateA,
-        nameA,
-        symbolA,
-        decimals,
-        owner.address,
-        cerc20.address,
-        "0x"
-    );
-    cTokenB = await delegator.deploy(
-        uniAddress,
-        comptroller.address,
-        interestRateModel.address,
-        exchangeRateB,
-        nameB,
-        symbolB,
-        decimals,
-        owner.address,
-        cerc20.address,
-        "0x"
-    );
+    cTokenA = await delegator.deploy(usdcAddress, comptroller.address, interestRateModel.address, exchangeRateA, nameA, symbolA, decimals, owner.address, cerc20.address, "0x");
+    cTokenB = await delegator.deploy(uniAddress, comptroller.address, interestRateModel.address, exchangeRateB, nameB, symbolB, decimals, owner.address, cerc20.address, "0x");
 }
 
 async function setcomptroller() {
@@ -164,9 +138,7 @@ describe("# Flashloan", async () => {
 
             await cTokenA.connect(addr1).mint(USDCAmount);
 
-            expect(Number(await cTokenA.balanceOf(addr1.address))).to.eq(
-                Number(USDCAmount) * 1e12
-            );
+            expect(Number(await cTokenA.balanceOf(addr1.address))).to.eq(Number(USDCAmount) * 1e12);
         });
 
         it("owner approve 1000 uni(tokenB) for compound and supply ", async () => {
@@ -205,22 +177,13 @@ describe("# Flashloan", async () => {
         */
 
         it("create flashloan contract", async () => {
-            let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(
-                owner.address
-            );
+            let borrowBalance = await cTokenA.callStatic.borrowBalanceCurrent(owner.address);
 
             repayAmount = (BigInt(borrowBalance) * closeFactor) / BigInt(1e18);
 
             // addr1 create flashloan contract
             let Flashloan = await ethers.getContractFactory("AaveFlashLoan");
-            flashloan = await Flashloan.connect(addr1).deploy(
-                AAVE_ADDRESS_PROVIDER,
-                UNISWAP_ROUTER,
-                cTokenA.address,
-                cTokenB.address,
-                owner.address,
-                repayAmount
-            );
+            flashloan = await Flashloan.connect(addr1).deploy(AAVE_ADDRESS_PROVIDER, UNISWAP_ROUTER, cTokenA.address, cTokenB.address, owner.address, repayAmount);
         });
 
         it("execute flashloan & addr1 should receive USDC not flashloan contract", async () => {
@@ -232,14 +195,7 @@ describe("# Flashloan", async () => {
             // using params to call "transfer()" from flashloan contract to addr1
             expect(await usdc.balanceOf(flashloan.address)).to.eq(0);
 
-            expect(
-                Math.floor(
-                    ethers.utils.formatUnits(
-                        await usdc.balanceOf(addr1.address),
-                        6
-                    )
-                )
-            ).to.eq(121);
+            expect(Math.floor(ethers.utils.formatUnits(await usdc.balanceOf(addr1.address), 6))).to.eq(121);
         });
     });
 });
