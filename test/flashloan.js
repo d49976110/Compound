@@ -51,13 +51,13 @@ async function deployContracts() {
     let InterestRateModel = await ethers.getContractFactory("WhitePaperInterestRateModel");
     interestRateModel = await InterestRateModel.deploy(0, 0);
 
-    //create comptroller
-    Comptroller = await ethers.getContractFactory("Comptroller");
-    comptroller = await Comptroller.deploy();
-
     //create oracel
     let Oracle = await ethers.getContractFactory("SimplePriceOracle");
     oracle = await Oracle.deploy();
+
+    //create comptroller
+    Comptroller = await ethers.getContractFactory("Comptroller");
+    comptroller = await Comptroller.deploy();
 
     // proxy setting (set unitroller & comptroller)
     let Unitroller = await ethers.getContractFactory("Unitroller");
@@ -74,6 +74,7 @@ async function deployContracts() {
     let CERC20 = await ethers.getContractFactory("CErc20Delegate"); // logic implementation
     cerc20 = await CERC20.deploy();
     let delegator = await ethers.getContractFactory("CErc20Delegator"); // proxy contract
+    // deploy contract
     cTokenA = await delegator.deploy(usdcAddress, comptroller.address, interestRateModel.address, exchangeRateA, nameA, symbolA, decimals, owner.address, cerc20.address, "0x");
     cTokenB = await delegator.deploy(uniAddress, comptroller.address, interestRateModel.address, exchangeRateB, nameB, symbolB, decimals, owner.address, cerc20.address, "0x");
 }
@@ -83,18 +84,23 @@ async function setcomptroller() {
     await oracle.setUnderlyingPrice(cTokenA.address, tokenAPrice);
 
     await oracle.setUnderlyingPrice(cTokenB.address, tokenBPrice);
-    //support market
-    await comptroller._supportMarket(cTokenA.address);
-    await comptroller._supportMarket(cTokenB.address);
+
     //set oracle
     await comptroller._setPriceOracle(oracle.address);
-    //set collateral
-    await comptroller._setCollateralFactor(cTokenA.address, collateralFactorA);
-    await comptroller._setCollateralFactor(cTokenB.address, collateralFactorB);
+
     // set close factor
     await comptroller._setCloseFactor(closeFactor);
     // set liquidation incentive
     await comptroller._setLiquidationIncentive(liquidationIncentive);
+
+    //support market
+    await comptroller._supportMarket(cTokenA.address);
+    await comptroller._supportMarket(cTokenB.address);
+
+    //set collateral
+    await comptroller._setCollateralFactor(cTokenA.address, collateralFactorA);
+    await comptroller._setCollateralFactor(cTokenB.address, collateralFactorB);
+
     // token B
 }
 
