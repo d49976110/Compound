@@ -51,10 +51,6 @@ async function deployContracts() {
     let InterestRateModel = await ethers.getContractFactory("WhitePaperInterestRateModel");
     interestRateModel = await InterestRateModel.deploy(0, 0);
 
-    //create oracel
-    let Oracle = await ethers.getContractFactory("SimplePriceOracle");
-    oracle = await Oracle.deploy();
-
     //create comptroller
     Comptroller = await ethers.getContractFactory("Comptroller");
     comptroller = await Comptroller.deploy();
@@ -64,7 +60,6 @@ async function deployContracts() {
     unitroller = await Unitroller.deploy();
 
     await unitroller._setPendingImplementation(comptroller.address);
-    // await unitroller._acceptImplementation();
 
     await comptroller._become(unitroller.address); // unitroller can't _acceptImplementation() by itself, it need through comptroller using _become()
 
@@ -79,12 +74,17 @@ async function deployContracts() {
     cTokenB = await delegator.deploy(uniAddress, comptroller.address, interestRateModel.address, exchangeRateB, nameB, symbolB, decimals, owner.address, cerc20.address, "0x");
 }
 
-async function setcomptroller() {
+async function setOracle() {
+    //create oracle
+    let Oracle = await ethers.getContractFactory("SimplePriceOracle");
+    oracle = await Oracle.deploy();
+
     //set oracle first, otherwise comptroller._setCollateralFactor will revert
     await oracle.setUnderlyingPrice(cTokenA.address, tokenAPrice);
-
     await oracle.setUnderlyingPrice(cTokenB.address, tokenBPrice);
+}
 
+async function setComptroller() {
     //set oracle
     await comptroller._setPriceOracle(oracle.address);
 
@@ -136,7 +136,8 @@ describe("# Flashloan", async () => {
     });
     describe("Using Uni as collateral to borrow USDC", async () => {
         it("admin set oracle & comptroller", async () => {
-            await setcomptroller();
+            await setOracle();
+            await setComptroller();
         });
 
         it("addr1 approve 5000 usdc(tokenA) for compound and supply", async () => {

@@ -4,11 +4,7 @@ const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("Governor Bravo", async () => {
     let unitroller, Comptroller, comptroller;
-    let timelock,
-        governorBravoDelegate,
-        comp,
-        governorBravoDelegator,
-        governorAlpha;
+    let timelock, governorBravoDelegate, comp, governorBravoDelegator, governorAlpha;
     let proposeId;
 
     //liquidate factor
@@ -46,9 +42,7 @@ describe("Governor Bravo", async () => {
             timelock = await Timelock.deploy(owner.address, 259200); // 3 days
 
             //governorBravo
-            let GovernorBravoDelegate = await ethers.getContractFactory(
-                "GovernorBravoDelegate"
-            );
+            let GovernorBravoDelegate = await ethers.getContractFactory("GovernorBravoDelegate");
             governorBravoDelegate = await GovernorBravoDelegate.deploy();
 
             //Comp
@@ -56,18 +50,10 @@ describe("Governor Bravo", async () => {
             comp = await Comp.deploy(owner.address);
 
             //governorBravo delegator
-            let GovernorBravoDelegator = await ethers.getContractFactory(
-                "GovernorBravoDelegator"
-            );
+            let GovernorBravoDelegator = await ethers.getContractFactory("GovernorBravoDelegator");
 
-            let GovernorAlpha = await ethers.getContractFactory(
-                "GovernorAlpha1"
-            );
-            governorAlpha = await GovernorAlpha.deploy(
-                timelock.address,
-                comp.address,
-                owner.address
-            );
+            let GovernorAlpha = await ethers.getContractFactory("GovernorAlpha1");
+            governorAlpha = await GovernorAlpha.deploy(timelock.address, comp.address, owner.address);
 
             governorBravoDelegator = await GovernorBravoDelegator.deploy(
                 timelock.address,
@@ -80,9 +66,7 @@ describe("Governor Bravo", async () => {
             );
 
             // attach
-            governorBravoDelegator = GovernorBravoDelegate.attach(
-                governorBravoDelegator.address
-            );
+            governorBravoDelegator = GovernorBravoDelegate.attach(governorBravoDelegator.address);
         });
 
         it("set unitroller admin to be timelock", async () => {
@@ -93,58 +77,29 @@ describe("Governor Bravo", async () => {
             await unitroller._setPendingAdmin(timelock.address);
 
             // time lock accept unitroller admin
-            await timelock.queueTransaction(
-                comptroller.address,
-                0,
-                "_acceptAdmin()",
-                "0x",
-                eta
-            );
+            await timelock.queueTransaction(comptroller.address, 0, "_acceptAdmin()", "0x", eta);
 
             await helpers.time.increaseTo(eta);
 
-            await timelock.executeTransaction(
-                comptroller.address,
-                0,
-                "_acceptAdmin()",
-                "0x",
-                eta
-            );
+            await timelock.executeTransaction(comptroller.address, 0, "_acceptAdmin()", "0x", eta);
         });
 
         it("set timelock admin as bravo", async () => {
-            let data = ethers.utils.defaultAbiCoder.encode(
-                ["address"],
-                [governorBravoDelegator.address]
-            );
+            let data = ethers.utils.defaultAbiCoder.encode(["address"], [governorBravoDelegator.address]);
             let delay = await timelock.delay();
             let now = await helpers.time.latest();
             let eta = now + delay.toNumber() + 2;
 
-            await timelock.queueTransaction(
-                timelock.address,
-                0,
-                "setPendingAdmin(address)",
-                data,
-                eta
-            );
+            await timelock.queueTransaction(timelock.address, 0, "setPendingAdmin(address)", data, eta);
 
             await helpers.time.increaseTo(eta);
 
-            await timelock.executeTransaction(
-                timelock.address,
-                0,
-                "setPendingAdmin(address)",
-                data,
-                eta
-            );
+            await timelock.executeTransaction(timelock.address, 0, "setPendingAdmin(address)", data, eta);
 
             // bravo accept
             await governorBravoDelegator._initiate(governorAlpha.address);
 
-            expect(await timelock.admin()).to.eq(
-                governorBravoDelegator.address
-            );
+            expect(await timelock.admin()).to.eq(governorBravoDelegator.address);
         });
     });
     describe("Use governorBravo to set comptroller close factor", async () => {
@@ -155,29 +110,15 @@ describe("Governor Bravo", async () => {
 
         it("set owner to white list", async () => {
             let time = (await helpers.time.latest()) + 86400;
-            await governorBravoDelegator._setWhitelistAccountExpiration(
-                owner.address,
-                time
-            );
-            expect(
-                await governorBravoDelegator.isWhitelisted(owner.address)
-            ).to.eq(true);
+            await governorBravoDelegator._setWhitelistAccountExpiration(owner.address, time);
+            expect(await governorBravoDelegator.isWhitelisted(owner.address)).to.eq(true);
         });
 
         it("propose", async () => {
             //propose
-            let data = ethers.utils.defaultAbiCoder.encode(
-                ["uint256"],
-                [newCloseFactor]
-            );
+            let data = ethers.utils.defaultAbiCoder.encode(["uint256"], [newCloseFactor]);
 
-            await governorBravoDelegator.propose(
-                [comptroller.address],
-                [0],
-                ["_setCloseFactor(uint256)"],
-                [data],
-                "change close factor"
-            );
+            await governorBravoDelegator.propose([comptroller.address], [0], ["_setCloseFactor(uint256)"], [data], "change close factor");
         });
         it("cast vote", async () => {
             proposeId = await governorBravoDelegator.proposalCount();
@@ -204,9 +145,7 @@ describe("Governor Bravo", async () => {
             // execute
             await governorBravoDelegator.execute(proposeId);
 
-            expect(await comptroller.closeFactorMantissa()).to.eq(
-                newCloseFactor
-            );
+            expect(await comptroller.closeFactorMantissa()).to.eq(newCloseFactor);
         });
     });
 });
