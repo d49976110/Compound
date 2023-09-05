@@ -32,33 +32,56 @@ let chagnedCollateralFactorB = BigInt(0.4 * 1e18);
 let closeFactor = BigInt(0.5 * 1e18); //可以清算的％
 let liquidationIncentive = BigInt(1.08 * 1e18);
 
+/**
+    - Interest model [global]
+        - baseRatePerYear : 基礎利率％
+        - multiplierPerYear : 每年乘數％
+    - Oracle [global]
+        - setUnderlyingPrice : 設定抵押物價格，價格不能為0，否則_setCollateralFactor會revert [per cToken market]
+    - Collateral factor [per cToken market]
+        - collateralFactor : 抵押率％，要 <= 0.9%，否則_setCollateralFactor會revert
+    - Comptroller
+        - _supportMarket : 支援市場
+        - _setPriceOracle : 設定Oracle
+        - _setCollateralFactor : 設定抵押率
+        - _setCloseFactor : 設定可以清算的％
+        - _setLiquidationIncentive : 設定清算獎勵％
+    - CToken
+        - mint : 存款
+        - redeem : 提款
+        - borrow : 借款
+        - repayBorrow : 還款
+        - liquidateBorrow : 清算
+    - Liquidate factor [global]
+        - closeFactor : 可以清算的％
+        - liquidationIncentive : 清算獎勵％
+*/
+
 async function deployContracts() {
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-    // create tokenA & tokenB
+    // TokenA & TokenB
     let Erc20 = await ethers.getContractFactory("ERC20_custom");
     tokenA = await Erc20.deploy("TokenA", "TOA");
     tokenB = await Erc20.deploy("TokenB", "TOB");
 
-    // create interest model
+    // Interest model [o]
     let InterestRateModel = await ethers.getContractFactory("WhitePaperInterestRateModel");
     interestRateModel = await InterestRateModel.deploy(0, 0);
 
-    //create comptroller
-    Comptroller = await ethers.getContractFactory("Comptroller");
-    comptroller = await Comptroller.deploy();
-
-    //create oracel
+    // Oracel [o]
     let Oracle = await ethers.getContractFactory("SimplePriceOracle");
     oracle = await Oracle.deploy();
 
-    // proxy setting (set unitroller & comptroller)
+    // Comptroller
+    Comptroller = await ethers.getContractFactory("Comptroller");
+    comptroller = await Comptroller.deploy();
+
+    // Unitroller is proxy : set unitroller & comptroller
     let Unitroller = await ethers.getContractFactory("Unitroller");
     unitroller = await Unitroller.deploy();
 
     await unitroller._setPendingImplementation(comptroller.address);
-    await unitroller._acceptImplementation();
-
     await comptroller._become(unitroller.address);
 
     comptroller = await Comptroller.attach(unitroller.address); // Comptroller is the a logic contract abi => using unitroller address but use comptroller abi
