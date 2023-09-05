@@ -23,8 +23,6 @@ describe("Governor Bravo", async () => {
         unitroller = await Unitroller.deploy();
 
         await unitroller._setPendingImplementation(comptroller.address);
-        await unitroller._acceptImplementation();
-
         await comptroller._become(unitroller.address);
 
         comptroller = await Comptroller.attach(unitroller.address); // comptroller is a proxy => using unitroller address but use comptroller abi
@@ -118,7 +116,13 @@ describe("Governor Bravo", async () => {
             //propose
             let data = ethers.utils.defaultAbiCoder.encode(["uint256"], [newCloseFactor]);
 
-            await governorBravoDelegator.propose([comptroller.address], [0], ["_setCloseFactor(uint256)"], [data], "change close factor");
+            await governorBravoDelegator.propose(
+                [comptroller.address],
+                [0],
+                ["_setCloseFactor(uint256)"],
+                [data],
+                "change close factor"
+            );
         });
         it("cast vote", async () => {
             proposeId = await governorBravoDelegator.proposalCount();
